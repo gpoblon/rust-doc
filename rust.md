@@ -8,6 +8,8 @@
 - variable signature is optional
 - function parameters signature is mandatory
 - function return signature is optional
+- use the `use` keyword to bring parent module of an elem (fun, struct, enum...) into scope, not directly the element
+- exception: if two types have the same name, use `use` on its parent or rename it with `use std::io::Result as IoResult;`
 
 # INSTALLATION (1.1)
 
@@ -122,11 +124,17 @@ fn get_len(s: &String) -> usize {
 ```
 `s` contains only the ptr to s1.
 
-#### Mutable references
+##### Mutable references
 A borrowed value cannot be modified unless `mut` is used: `...fn get_len(s: &String) -> usize {...`. Ofc the initial `String` has to be `mut` too.
 Restriction: `let r1 = &mut s; let r2 = &mut s;` only one mut ref of a data at a given scope. Trick is to create a new scope (`{ let r1 = &mut s; }`)
 Useful because if the ownership is passed the variable dies in the new scope and becomes impossible to use in the previous one.
-Can have multiple immutable ref but not a mut while having an immutable one.
+Can have multiple immutable ref but not a mut while having an immutable one. Security measure, ex:
+```
+let first = &v[0]; // immutable borrow
+v.push(6); // mutable borrow
+```
+will not compile because if the new element pushed implies a reallocation, the reference to the first would then point to a deallocated zone = crash.
+
 
 ## Dangling references
 Cannot create a variable in a scope and return a reference to this variable. You must return the variable directly.
@@ -169,17 +177,17 @@ fn build_user(email: String, username: String) -> User {
 ```
 Note that either the entire struct is mutable or it is not at all, fields cannot.
 
-#### Creating instances from other instances with stuct update syntax
+##### Creating instances from other instances with stuct update syntax
 `let user2 = User { ..user1 };`
 
-#### Tuple structs
+##### Tuple structs
 structs without named fields: `struct Color(i32, i32, i32); let black = Color(0, 0, 0);` vs tuple `let color = (0, 0, 0);`
 The only difference with tuples is that the struct is named and cannot be swapped with an equivalent typed struct as a function param for exemple.
 
-#### Unit-like structs
+##### Unit-like structs
 Empty `()` structs. Useful when... see later.
 
-#### Ownership of struct data
+##### Ownership of struct data
 Structs can have references owned by something else using the lifetimes feature.
 
 ## Debug a struct (5.2)
@@ -211,11 +219,11 @@ and is called by: `rect1.area();`.
 `self` is only borrowed because it just reads, does not write (`&mut self`) / does not need ownership (rare).
 Rust has a feature called 'automatic de/referencing', adding `& mut *` to match the object signature so `->` is not needed to access an method.
 
-#### Associated functions
+##### Associated functions
 functions != methods: are part of the struct BUT they do not have a `self` param. Often use to create a new instance of the struct.
 It is called by `rect1::my_fun();`.
 
-#### Multiple `impl` Blocks
+##### Multiple `impl` Blocks
 Sometimes useful.
 
 # ENUMS AND PATTERN MATCHING (6)
@@ -233,7 +241,7 @@ Can be used as struct field or a param: `fn route(message: Message) { }` then ca
 An enum can contain data (including methods, structs, enums).
 Methods are declared as they are in structs, using `impl` and are called on any elem of the enum: `Message::Write(String::from("hello")).call();`
 
-#### Option type (enum)
+##### Option type (enum)
 Replaces the `null` value that cause too many errors.
 ```
 enum Option<T> {
@@ -273,7 +281,7 @@ fn value_in_cents(coin: Coin) -> u32 {
 }
 ```
 `match` is commonly used against `enum`s.
-#### Matching with `Option<T>`
+##### Matching with `Option<T>`
 ```
 fn plus_one(x: Option<i32>) -> Option<i32> {
     match x {
@@ -282,9 +290,9 @@ fn plus_one(x: Option<i32>) -> Option<i32> {
     }
 }
 ```
-#### Match is exhaustive
+##### Match is exhaustive
 ...so all cases must be handled (if not: compilation error).
-#### The placeholder `_`
+##### The placeholder `_`
 matches any value
 ```
     match u8_value {
@@ -351,7 +359,7 @@ mod sound {
 ```
 if `clarinet()` was not pub it would not be accessible from the root of the crate.
 
-#### Starting Relative Paths with `super`
+##### Starting Relative Paths with `super`
 `super` is equivalent to: `../` to the path: calling `super::foo()` calls the parents' module `foo` function. Ex:
 ```
 mod sound {
@@ -364,3 +372,113 @@ mod sound {
     fn breathe_in() {} // child of sound module
 }
 ```
+##### Using `pub` with structs and enums
+If `pub` is used before `struct` its fields are still private, even simple variables.
+If an `enum` is public its elements are too.
+##### The `use` keyword to bring paths into a scope
+`use` can be called from everywhere (function, root, module etc).
+`use crate::sound::instrument;` brings an absolute path into scope and allows to directly use `instrument::whatever`.
+To bring a relative path into scope (ie from the current scope), use the `self` keyword: `use self::sound::instrument;`.
+##### Idiomatic `use` paths for functions vs. other items
+`use` path for functions / structs / enums etc is a bad practice (`use crate::sound::instrument::clarinet;`). It is better to use `use` on modules to keep it clear that path definition is not local.
+##### Renaming types brought into scope with the `as` keyword
+if two types have the same name, either: bring its parent to scope (exception of the previous rule) or rename it: `use std::io::Result as IoResult;`
+##### Re-exporting names with `pub use`
+```
+mod performance_group {
+    pub use crate::sound::instrument;
+}
+```
+`instrument` becomes available not only for the `performance_group` module but for others to bring it into their scope.
+##### Using external packages
+*Cargo.toml file*
+```
+[dependencies]
+rand = "0.5.5"
+```
+makes rand available from everywhere but `use rand::needed_trait` is needed to bring a trait of a package into scope.
+Exception: `std` (which is an absolute path) is shipped with rust so no need to update *Cargo.toml* but `use` is still requiered to bring items into scope.
+##### Nested paths forcleaning up large `use` lists
+`use std::io::{self, Write};` brings into scope the `std::io` and `std::io::Write` modules.
+##### Bringing all public definitions into scope (Glob operator)
+`use std::collections::*;` to use sparingly (mainly `tests` module)
+
+#### Separating modules into different files
+sound could be moved into a *src/sound.rs* file. It would be called in main as:
+```
+mod sound; // semicolon tells Rust to load a module with the same name as the module.
+
+fn main() {
+    crate::sound::instrument::clarinet();
+    // OR
+    sound::instrument::clarinet();
+}
+```
+The `instrument` module can be isolated too: *src/sound/instrument.rs* can be created to handle the `instrument` module and leave only the `mod instrument;` into the `sound` module.
+
+# COMMON COLLECTIONS (8)
+Stored on the heap vs tuples and build-in arrays.
+Amount of data stored does not need to be known at compile time.
+Most commonly used: Vectors, Strings and Hash Maps.
+
+## Vectors `Vec<T>` (8.1)
+Store several values of any single data type.
+##### Create
+`let v: Vec<i32> = Vec::new();` but if there are initial values type can be infer using `vec!` macro: `let v - vec![1, 2, 3];`
+##### Update
+```
+let mut v = vec![1, 2, 3];
+v.push(5);
+```
+There is a pop method too that removes and returns the last elements.
+##### Drop
+The vector and all its elements are dropped when out of scope.
+##### Reading elements
+`&v[9]` or `v.get(9)` gets the ninth elem. If the index does not exist:
+- `[]` will panic. Use it if non-existant indexes should not be passed.
+- with the accessor `get` it will return `None`. Should be used with the `match` expr: 
+    ```
+    match v.get(9) {
+        Some() => println("Exists!"),
+        None => println("Does not exist."),
+    }
+    ```
+    Use it if it is normal to hit non-existant indexes.
+
+Impossible to hold an immutable ref to a vector and try to add elems: 
+```
+let first = &v[0]; // immutable borrow
+v.push(6); // mutable borrow
+```
+will not compile because if the new element pushed implies a reallocation, the reference to the first would then point to a deallocated zone = crash.
+##### Iterate
+read: `for i in &v {}`
+write: `for i in &mut v { *i += 50; }`. Note that i has to be dereferenced before it can be used with the `+=` operator.
+##### Using Enums to store multiple types
+```
+enum SpreadsheetCell {
+    Int(i32),
+    Float(f64),
+    Text(String),
+}
+
+let row = vec![
+    SpreadsheetCell::Int(3),
+    SpreadsheetCell::Text(String::from("blue")),
+    SpreadsheetCell::Float(10.12),
+];
+```
+Nice trick to use any exhaustive types. 
+
+## Strings (8.2)
+Collection of UTF-8 encoded chars.
+##### Definition
+By opposition to *string literals* `str` which are stored in the binary output of the program, `String`s are stored in the heap.
+##### Creation
+`let mut s = String::new();` creates an empty string
+`let s = "test".to_string();` OR `let s = String::from("test");` create a `String` from a literal
+##### Update
+
+
+## Hash Maps (8.3)
+Associate a value with a key via an implementation of maps.
