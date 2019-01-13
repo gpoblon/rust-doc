@@ -102,11 +102,12 @@ Rules:
 - Each value in Rust has a variable that’s called its owner.
 - There can only be one owner at a time.
 - When the owner goes out of scope, the value will be dropped.
+- Value and variable are distinct as the variable can be rewritten after its value as been freed.
 
 Ex through String.
 `let s = "hello";` is a string literal (hardcoded) vs `let mut s1 = String::from("hello");` that can be edited and is located on the heap.
 String is composed of 3 variables in the stack: a ptr to the heap ; a len ; a capacity (nbr of allocated bytes from the system).
--  Move copy: `let s2 = s1;` s1 is moved into s2 AND `s1` becomes invalid. s2 is a copy of the stack but still, is a reference.
+-  Move copy: `let s2 = s1;` s1 is moved into s2 AND `s1` value is freed and becomes invalid. `s1` is still available as a variable and can therefore be rewritten. s2 is a copy of the stack but still, is a reference.
 - Deep clone: `let s2 = s1.clone();` copies the whole data, creating a new pointer.
 
 Some types have the `Copy` trait such as: integer, bool, float, char. Tuple too if they contain only `Copy` types. Means that after `let x = 5; let y = x;`, `x` is still valid.
@@ -478,7 +479,35 @@ By opposition to *string literals* `str` which are stored in the binary output o
 `let mut s = String::new();` creates an empty string
 `let s = "test".to_string();` OR `let s = String::from("test");` create a `String` from a literal
 ##### Update
+###### Append
+`s.push_str("bar");` or `s.push('c');` (`push` can only take one char).
+###### Concatenate
+```
+let s1 = String::from("tic");
+let s2 = String::from("tac");
+let s3 = String::from("toe");
+let s = s1 + "-" + &s2 + "-" + &s3;
+```
+`+` operator calls `fn add(self, s: &str) -> String {`.
+It works even if `&s2` type is `&String` bc compile can *coerce* `&String` into a `&str` param.
+Second argument is a `ref` so s2 will still be valid. But first is not, `s1` will not.
 
+Concatenation can be done without taking any ownership, using a macro: `let s = format!("{}-{}-{}", s1, s2, s3);`.
+##### Indexing into Strings
+In Rust a letter can be seen either as:
+- bytes: [224, 164, 164, 224, 165, 135]
+- scalar values: ['त', 'े'] (second value is a diacritic not a char)
+- grapheme clusters (the closest thing to letters): [ "ते" ]
+
+`let c = &"hello"[0];` is invalid as it would be a source of many bugs and a performance issue: bc in memory `Strings` are a wrapper over a `Vec<u8>`, `s1[0]` would return the first byte `104` (`'h'` in utf8) and not the first char.
+len of `let len = String::from("Здравствуйте").len();` is not 12 (unicode scalar value), it is 24 (bytes needed to encode in UTF-8). 
+
+##### Slice
+`let s = &"Здравствуйте"[0..4];` `s -> "Зд"` works but it is not safe: `let s = &"Здравствуйте"[0..1];` Rust would panic at runtime bc the index is invalid.
+Solutions:
+- iterate over scalar unicode values with `chars`: `for c in "नमस्ते".chars() {`
+- iterate over bytes values with `bytes`: `for b in "नमस्ते".bytes() {`
+- iterate over grapheme clusters is complex and is provided by crates, not by the standard library.
 
 ## Hash Maps (8.3)
 Associate a value with a key via an implementation of maps.
