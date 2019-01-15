@@ -510,4 +510,141 @@ Solutions:
 - iterate over grapheme clusters is complex and is provided by crates, not by the standard library.
 
 ## Hash Maps (8.3)
-Associate a value with a key via an implementation of maps.
+The type `HashMap<K, V>` associates a value with a key via an implementation of maps. This type is not included in the prelude.
+`HashMap`s are hashed and therefore DoS resistant (speed / safe balanced algo). But another *hasher* can be specified (`BuildHasher` trait) that can be implemented by hand or called from a public library.
+
+##### Creation
+`let mut scores = std::collections::HashMap::new();` creates an empty has map.
+`scores.insert(String::from("Blue"), 10);` all the keys / values (distinctly) must have the same type.
+```
+use std::collections::HashMap;
+
+let teams  = vec![String::from("Blue"), String::from("Yellow")];
+let initial_scores = vec![10, 50];
+
+let scores: HashMap<_, _> = teams.iter().zip(initial_scores.iter()).collect();
+```
+type of score can not be infered bc `collect()` can return different types.
+`teams.iter().zip(initial_scores.iter())` creates a vector of tuples.
+
+##### Ownership
+For `Copy` trait types (i32...) values are copied. For owned values (`Strings`...) the `HashMap` values are moved and it becomes the owner unless a ref is used but the variable must live until the `HashMap` dies.
+
+##### Access
+`let score = scores.get(&String::from("Blue"));` As `get` returns an option the result will be `Some(&10)`.
+`for (key, value) in &scores {` works.
+! order is arbitrary.
+
+##### Update
+###### By overwriting a value
+Simply redo `scores.insert(String::from("Blue"))` will overwrite the old value.
+###### By inserting a value only if key does not exist
+`scores.entry(String::from("Blue")).or_insert(50);` `entry()` returns an Enum called `Entry`.
+`or_insert` keeps the old value if it exists, if not: inserts the param as the new value. And it returns a mutable ref to the new *(or not)* value.
+###### By updating the new value working on the old one
+```
+let score = map.entry(String::from("Blue")).or_insert(0);
+*score += 10;
+```
+blue team, if exists, sees its score updated. `score` has type `&mut V` so it needs to be refererenced to be updated. 
+
+##### Print
+`println!("{:?}", scores);` will output `{"Yellow": 50, "Blue": 10}`.
+
+# Error Handling (9)
+Rust does not have exceptions and instead distinguishes 2 types of errors:
+- *unrecoverable* errors
+    Set by the dev
+    Stop the execution of the program
+    Covered by the usage of the `panic!` macro
+- *recoverable* errors
+    ex: file not found.
+    Problem is reported to the user but the program keeps running
+    Covered by the usage of the `Result<T, E>` type
+
+## Unrecoverable Errors with panic! (9.1)
+When the `panic!` macro executes program prints a failure message, clean the program (*unwinds*) then quit it.
+! *abort* which quits without unwinding and lets the operating system cleaning the memory.
+`panic!` result can be set to *abort* in the *Cargo.toml* file.
+```
+[profile.release]
+panic = 'abort'
+```
+A call to the `panic!` macro causes this message: `thread 'main' panicked at 'crash message set', src/main.rs:2:4`.
+When the `panic!` calls comes from an external library (!= our source code) we will need a backtracker to find the origin bc the error message points to the lib.
+Example: `let v = vec![1, 2, 3];` if we try to access a non-existant value (`v[99]`) in C we would hit a memory that is not ours (*buffer overread*). In Rust will panic: `thread 'main' panicked at 'index out of bounds: the len is 3 but the index is 99', /checkout/src/liballoc/vec.rs:1555:10`
+Running `RUST_BACKTRACE=1 cargo run` with debug symbols enabled (meaning `--release` flag is not set) allows to catch the error from our own code: `11: panic::main at src/main.rs:4`.
+
+## Recoverable Errors with Result (9.2)
+`Result` definition (`T` and `E` represent the value returned depending on the case):
+```
+enum Result<T, E> {
+    Ok(T),
+    Err(E),
+}
+```
+Example: `open()` returns a `Result` value. If it succeeds f will contain an instance of `Ok` that contains the `std::fs::File` (file handler). If it fails f will contain an instance of `Err` that contains a `std::io::Error` type.
+```
+fn main() {
+    let f = std::fs::File::open("hello.txt");
+    let f = match f {
+        Ok(file) => file,
+        Err(error) => match error.kind() {
+            ErrorKind::NotFound => match File::create("hello.txt") {
+                Ok(fc) => fc,
+                Err(e) => panic!("Tried to create file but there was a problem: {:?}", e),
+            },
+            other_error => panic!("There was a problem opening the file: {:?}", other_error),
+        },
+    };
+}
+```
+Tip: giving to the compiler a wrong return type (`let f : u32 = std::fs::File::open("hello.txt");`) will led to the compiler giving out what was excepted.
+`Result::` specifier is not needed bc it is part of the prelude.
+
+`match` alternatives:
+- `let f = File::open("hello.txt").unwrap();`. `unwrap` will either return directly the result of `Ok` or automatically call the `panic!` macro.
+- `let f = File::open("hello.txt").expect("Failed to open hello.txt");`. `expect` is similar to `unwrap` with a provided `panic!` message (easier to know where the error comes from).
+##### propagating errors
+IE return the error to the calling code instead of handling it within the function.
+###### The `?` operator
+```
+fn read_username_from_file() -> Result<String, io::Error> {
+    let mut f = File::open("hello.txt")?;
+    let mut s = String::new();
+    f.read_to_string(&mut s)?;
+    Ok(s) // called if everything works fine
+}
+```
+This code can be shortened as:
+```
+    let mut s = String::new();
+    File::open("hello.txt")?.read_to_string(&mut s)?;
+    Ok(s)
+```
+actually all this could be shortened to returning `fs::read_to_string("hello.txt")` which opens the file by itslef.
+`?` is a nice shortcut. (It calls the `from` trait which converts error types, *so what ?*).
+Both `open()` and `read_to_string()` output a `Result`. If `Err`: function returns the error, if `Ok` it keeps going through the code.
+! `?` can only be used inside a function that returns a `Result` (`fn -> Result<String, io::Error> `) or it will not compile. Note that even the main can return a `Result`: `fn main() -> Result<(), Box<dyn Error>> {`.
+
+## To panic! or not to panic! (9.3)
+Compiler does not understand logic. So when a code has 0% chances to have an `Err`, `unwrap()` (returns the value from `Ok` or panics if `Err`) with no check is a good practice.
+`unwrap` (or `expect`) is a good practice when you have not decided yet how to deal with the error.
+##### Guideline
+`panic!` when code is in a *bad state*, ie:
+- When a value is invalid AND either: not expected to happen or code relies on being stable at this point or there is no good way to encode the information or it exposes to vulnerabilities
+- When someone uses your code and passes a values that does not make sense
+- When external code fails and there is no way to fix it ... unless a failure is the expected possibility, then `Result`.
+
+Pre-checks:
+- No need to check whether a value has been passed to a function if the param as a type and not an `Option` bc no value = will not compile
+- Use unsigned type when possible to ensure only positive values
+- In a module:
+    - implement a `new` method that does all checks and returns the good type(s). If not, `panic!` bc the contract is broken. Regrouped and secured checks (at creation).
+    - implement public setters/getters and keep variables private, so that only the setter does a check when editing a value (getter example: `pub fn value(&self) -> i32 { self.value }`)
+
+
+# Generic types, traits, and lifetimes (10)
+## Generic data types (10.1)
+## Traits: defining shared behaviors (10.2)
+## Validating references with lifetimes (10.3)
