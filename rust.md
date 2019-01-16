@@ -645,6 +645,83 @@ Pre-checks:
 
 
 # Generic types, traits, and lifetimes (10)
+
 ## Generic data types (10.1)
-## Traits: defining shared behaviors (10.2)
+A given generic type name can represent any given type but once it has been given, it keeps this same type.
+##### In functions
+`fn largest<T>(list: &[T]) -> T {`: `<T>` before params in the signature is mandatory so the compiler know what `T` means.
+Note: `T` (short for *type*) is the common identifier name. The input and output must have the same type but it can be any type.
+##### In structs
+`struct Point<T> { x: T, y: T, }`. Note that code will not compile if all type `T` fields are not of the same type.
+But there can be different *generics*: `struct Point<T, U> { x: T, y: U, }`.
+Too many different *generics* might be a sign of wrong design.
+##### In enums
+`enum Option<K, E> { Ok(K), Err(E), };`. Same thing.
+##### In method definitions
+In the `Point` struct, implement a `x` method: `impl<T> Point<T> {`. We need to declare `<T>` after `impl` too so the compiler knows that the `T` type from `Point` is a *generic*.
+Generic types declared in the implementation methods can differ from the original one, Ex:
+```
+struct Point<T, U> {
+    x: T,
+    y: U,
+}
+
+impl<T, U> Point<T, U> {
+    fn mixup<V, W>(self, other: Point<V, W>) -> Point<T, W> {
+        Point {
+            x: self.x,
+            y: other.y,
+        }
+    }
+}
+```
+`impl` generic type declarations can differ from method type parameters but must be the same as struct.
+Note that `<T, U>` are declared paired with Struct definition, `<V, W>` are declared after that, in their own relative scope 
+
+##### Performance of code using generics
+NO performance difference at runtime between generic and its concrete equivalent type. But takes longer to compile (*Monomorphization* = recreate code with concrete type from the generic form).
+```
+//generic
+enum Option<T> { Some(T), None, }
+let integer = Some(5);
+let float = Some(5.0);
+
+// monomorphized
+enum Option_i32 { Some(i32), None, }
+enum Option_f64 { Some(f64), None, }
+let integer = Option_i32::Some(5);
+let float = Option_f64::Some(5.0);
+```
+
+## Traits: defining shared behavior (10.2)
+A *trait* tells the compiler about a type's fonctionality. Resembles to *interfaces*
+##### Trait definition
+```
+pub trait Summary {
+    fn summarize(&self) -> String; // note the semicolon != brackets
+}
+```
+Any type that has the `Summary` trait must have the `summarize` method with the same signature. Needs to be `pub` so that another crate can implement it
+It is implemented as:
+```
+pub struct NewsArticle {
+    pub headline: String,
+    pub location: String,
+    pub author: String,
+    pub content: String,
+}
+
+impl Summary for NewsArticle {
+    fn summarize(&self) -> String {
+        format!("{}, by {} ({})", self.headline, self.author, self.location)
+    }
+}
+```
+implementing a trait is similar to implementing methods with `for` added.
+It is possible to make a trait local to a scope.
+! *coherence* restriction: a trait can be implemented on a type only if either the trait or the type is local to our crate.
+If the trait is not local, it needs to be brought into scope as: `use externalcrate::Summary;`
+
+##### Default implementations
+
 ## Validating references with lifetimes (10.3)
