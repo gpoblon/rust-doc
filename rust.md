@@ -723,5 +723,22 @@ It is possible to make a trait local to a scope.
 If the trait is not local, it needs to be brought into scope as: `use externalcrate::Summary;`
 
 ##### Default implementations
+It is overwritten by specific methods for a given trait but is still useful. Defined directly in the trait definition (vs semicolon)
+```
+pub trait Summary {
+    fn summarize(&self) -> String {
+        String::from("(Read more...)")
+    }
+}
+```
+Here if not overwritten, a default string will be create.
+To use the default implementation in an instance, call it empty: `impl Summary for NewsArticle {}`.
+
+##### Traits as arguments
+`pub fn notify(item: impl Summary) {` gives access to `item.summarize()` in the fun body.
+This form is a sugar for `pub fn notify<T: Summary>(item: T) {` which can be useful to force to have the same types when having 2+ params: `pub fn notify<T: Summary>(item1: T, item2: T) {`.
+Several traits can be `impl`: `pub fn notify(item: impl Summary + Display) {` or `pub fn notify<T: Summary + Display>(item: T) {`.
+
+# WHERE CLAUSES FOR CLEARER CODE
 
 ## Validating references with lifetimes (10.3)
