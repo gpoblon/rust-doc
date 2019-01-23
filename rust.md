@@ -738,7 +738,223 @@ To use the default implementation in an instance, call it empty: `impl Summary f
 `pub fn notify(item: impl Summary) {` gives access to `item.summarize()` in the fun body.
 This form is a sugar for `pub fn notify<T: Summary>(item: T) {` which can be useful to force to have the same types when having 2+ params: `pub fn notify<T: Summary>(item1: T, item2: T) {`.
 Several traits can be `impl`: `pub fn notify(item: impl Summary + Display) {` or `pub fn notify<T: Summary + Display>(item: T) {`.
+`where` clauses for clearer code: previous function could be written as:
+```
+pub fn notify<T>(item: T) -> i32
+    where T: : Summary + Display
+{
+```
+##### Returning traits
+```
+fn returns_summary() -> impl Summary {
+    Tweet {
+        username: String::from("Horse_ebooks"),
+        reply: false,
+    }
+}
+```
+Says something that implements the `Summary` trait is returned but the exact type is unknown (we are returning an `iterator`).
+! If the return type is unsure depending on how the function goes this cannot work.
 
-# WHERE CLAUSES FOR CLEARER CODE
+##### Compare `largest` function with trait bound
+To allow comparison and slices largest needs: 
+```
+fn largest<T: PartialOrd + Copy>(list: &[T]) -> T {
+    let mut largest = list[0]; // Copy trait needed to copy a <T>
+    for &item in list.iter() {
+        if item > largest { // PartialOrd trait needed to compare a <T>
+            largest = item;
+        }
+    }
+    largest
+}
+```
+##### Using trait bounds to conditionally implement methods
+```
+impl<T: Display + PartialOrd> Pair<T> {
+    fn cmp_display(&self) {
+        if self.x >= self.y {
+            println!("The largest member is x = {}", self.x);
+        } else {
+            println!("The largest member is y = {}", self.y);
+        }
+    }
+}
+```
+Here `cmp_display` is implemented only if `Display + PartialOrd` are implemented.
+*Blanket implementations* are extensively used: `impl<T: Display> ToString for T { }`. Here the `to_string()` method can be called on any type that implements the Display trait. That allows to turn int to string because integers implement display (`let s = 3.to_string();`)
 
 ## Validating references with lifetimes (10.3)
+    Main purpose: prevent dandling references. Rust uses a *Borrow Checker* that verifies the subject of a reference doesn’t live as long as the reference.
+Every reference has a *lifetime* (the scope for which it is valid). Often inferred but it sometimes has to be explicit
+`&'a mut i32` `'a` is a lifetime parameter. 2+ required to be meaningful, the point is to connect the lifetimes of parameters and return values:
+```
+fn longest<'a>(x: &'a str, y: &'a str) -> &'a str {
+    if x.len() > y.len() {
+        x
+    } else {
+        y
+    }
+}
+```
+will compile because lifetimes are explicit (and therefore Rust compiler knows they are 'synced'). It would not otherwise. Doing so we are not modifying their lifetime, we are just precising these to the compiler by saying "these three variables will and must at least exist in this scope".
+As a result, the compiler thinks the lifetime is equal to the smaller of the lifetimes. So this code will not compile:
+```
+fn main() {
+    let string1 = String::from("long string is long");
+    let result;
+    {
+        let string2 = String::from("xyz");
+        result = longest(string1.as_str(), string2.as_str());
+    }
+    println!("The longest string is {}", result);
+}
+```
+So when to specify lifetime params ? When a reference returned does not refer to a given param (above example: several params at the same time). Ofc if the returned reference refers to a variable created in the function it will not compile anyway (here should be returned the owned data, not a ref).
+
+##### Lifetime annotations in struct definitions
+Struct can hold references, but only if they have a lifetime annotation.
+`struct ImportantExcerpt<'a> { part: &'a str, }` it means an instance of this struct cannot outline its shortest ref lifetime (`'a`)
+##### Lifetime elision rules
+There are *input / output lifetimes* (params / return)
+Lifetime annotation can be inferred only in `fn` and `impl` cases. If the 3 following rules are applied and a reference does not have a lifetime, the annotation will not be inferred:
+- each ref param gets its own lifetime
+- if there is exactly 1 ref param its lifetime is assigned to all output lifetime parameters
+- if one of several params is `&self` or `&mut self` its lifetime is assigned to all output lifetime parameters
+#####  Static lifetime
+`'static` is a special lifetime which denotes the entire duration of the program: like all string literals. Should be use only when we want a variable to last the entire program
+
+
+# Testing (11)
+Test body:
+- Set up any needed data or state
+- Run the code you want to test
+- Assert the results are what you expect
+
+## Writing tests (11.1)
+##### Test attribute
+When `cargo test` is run, Rust runs every `#[test]` function and report whether each test function passes or fails
+We can add as many `mod` and `fn` tests as we want
+Each test is run in a new thread. If one fails it means the test function panicked.
+
+```
+#[cfg(test)]
+mod tests {
+    #[test] // there can be non-test functions in a test module
+    fn exploration() {
+        assert_eq!(2 + 2, 4);
+    }
+    
+    #[test]
+    fn another() {
+        panic!("Make this test fail");
+    }
+}
+```
+`cargo test` outputs:
+```
+running 2 tests
+test tests::exploration ... ok
+test tests::another ... FAILED
+
+failures:
+---- tests::another stdout ----
+    thread 'tests::another' panicked at 'Make this test fail', src/lib.rs:10:8
+note: Run with `RUST_BACKTRACE=1` for a backtrace.
+
+failures:
+    tests::another
+
+test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out
+
+    Doc-tests adder // only used for documentation tests
+...
+```
+###### `assert!` macro
+Takes a boolean. If it returns `true` test passes but if it returns false `panic!` is called and test fails (remember to negate a function if `false` means no issue)
+###### Test equality with the `assert_eq!` & `assert_ne!` macros
+`assert_eq!` checks for equality of 2 expr (left|excepted and right|actual), `assert_eq!` checks for inequality (useful when unsure what a value will be but sure what a value should not be)
+If one fails the values passed are printed (easier to see why the test failed)
+In some cases (structs and enums the programer define) will have to be added `#[derive(PartialEq, Debug)]` to check equality & print the values.
+##### Custom failure messages
+An optional argument can be added to `assert...!` macros that acts as the `format!` macro (variadic params) as: 
+`assert!(result.contains("Carol"), "Greeting did not contain name, value was {}", result);`
+
+##### check for panics
+the attribute `#[should_panic]` set a test as failed if `panic!` has not been called
+Must be called the line after the `#[test]` attribute.
+`expected` allows to check a `panic!` message includes the expected string literal: `#[should_panic(expected = "Guess value must be less than 100")]`. Tester will tell if program panicked & the right substring was printed, or will set the test as failed.
+
+##### Using Result<T, E> in tests
+Tester can work with Ok() (passed) / Err() (failed) instead of panics.
+`#[should_panic]` does not work with it but it's neat anyway:
+```
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn it_works() -> Result<(), String> {
+        if 2 + 2 == 4 {
+            Ok(())
+        } else {
+            Err(String::from("two plus two does not equal four"))
+        }
+    }
+}
+```
+
+## Running tests (11.2)
+Note: ` -- ` is a separator. Pre-params apply to `cargo test` & post-params apply to the binary
+###### Running tests in parallel or consecutively
+`cargo test -- --test-threads=1` means NO parallelism
+Takes longer but tests will not interfere with each other if they share a state
+Example of several tests writing to a same file at the same times might result in a failed test even if the code is ok
+###### Showing function output
+By default in the test environment standard ouput (like `println!`) is not printed on passed test but it is for failed test
+`cargo test -- --nocapture` allows to print ouput on passed tests too.
+###### Running a subset of tests by name
+A filtered test can be run by calling any function that has a `#[test] attribute`: `cargo test test_fn_name`
+! Tests will run on every test functions that have the param as a substring
+! Works with test module names too bc the checked string is `module::fn`
+It is possible to set the `#[ignore]` attribute (after `#[test]` line): these will not be tested unless `cargo test -- --ignored` is run, which will ONLY test `ignored` functions
+
+## Test organization (11.3)
+- *Unit tests* check every module, even private interfaces
+- *Integration tests* check code as an external user would
+Both are important to be sure pieces of a program work separately and together
+
+##### Unit tests
+Located in the *src* directory in each file, alongside the code they are testing
+Convention is to create a `tests` module in each file, annotated with `#[cfg(test)]` which tells Rust to compile it only when `cargo test` is run
+In Rust private functions can be tested, they are accessible by default by the testing environment
+
+##### Integration tests
+Entirely external to the library. Therefore no need for `#[cfg(test)]` but they can only call public API functions
+Create a *test* directory next to *src*, with a (for example) *tests/integration_test.rs* file that contains:
+```
+use crate_name;
+
+#[test]
+fn it_adds_two() {
+    assert_eq!(4, adder::add_two(2));
+}
+```
+When running `cargo test` 3 sections will now appear: unit / integration / doc tests but only integration test can be run: `cargo test --test integration_test` (as the filename). Multiple files can be added (ex one for each functionality tested). Then will appear a new section for each file.
+This can be avoid by creating *tests/common/mod.rs*: naming convention makes so these files will not be treated as separate crates, *common* will be treated as a module: adding only `pub fn setup() { }` to `mod.rs` allows to call it from *integration_test* as a module: 
+```
+use crate_name;
+mod common;
+
+#[test]
+fn it_adds_two() {
+    common::setup();
+    assert_eq!(4, adder::add_two(2));
+}
+```
+###### Integration tests for binary crates
+Rust projects that provide a binary have a straightforward src/main.rs file that calls logic that lives in the src/lib.rs file.
+Doing so allows to have *integration test*. It is not possible to `use` elements of a *src/main.rs* file: binary crates are meant to run on their own
+
+# Functional language features: Iterators and Closures (13)
+## Closures: anonymous functions (13.1)
+## Processing with iterators (13.2)
+## Performances: loops vs iterators (13.4)
