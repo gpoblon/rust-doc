@@ -955,6 +955,299 @@ Rust projects that provide a binary have a straightforward src/main.rs file that
 Doing so allows to have *integration test*. It is not possible to `use` elements of a *src/main.rs* file: binary crates are meant to run on their own
 
 # Functional language features: Iterators and Closures (13)
+
 ## Closures: anonymous functions (13.1)
+*Closures* are particular anonymous functions that are storable in a variable or passable as function arguments
+Unlike functions they capture their environment (can access parents scope variables)
+light syntax for inline closure: `let add_one = |x| x + 1 ;` ; full syntax:
+```
+let expensive_closure = |param1, param2| { // |param1: u32, param2: u32| -> u32 will compile too
+    println!("calculating slowly...");
+    thread::sleep(Duration::from_secs(2));
+    param1
+}; // semicolon needed to end the statement
+```
+`expensive_closure` contains the definition of the function not its result. It is called the same way a function is
+Annotate types is not needed (but possible), types are infered bc unlike functions closure are not interfaces exposed to users
+! The compiler infers types & traits at first call so recalling a closure with different param types will not compile
+###### Closures capture their environment
+Closure have, like functions, at least on of these traits that are inferred depending on what a closure does of its environment variables:
+- `FnOnce` takes ownership and consumes the environment variables, meaning this closure can only be called once
+    All closures implement it
+    To take ownership, use the `move` keyword before the parameter list (`let equal_to_x = move |z| z == x;`)
+- `FnMut` same but mutably: can change the environment
+    Implemented if the closure do not move the captured variables
+- `Fn` borrows values from the environment immutably
+    Implemented for closures that do not need mutable access to the captured variables
+###### Storing closures and their result
+This is known as *cache, memoization, lazy evaluation*. The solution is to store both the closure and its result in a struct. Whatever their signature is closures will have different types so solution is to consider them generics. 
+Closures are functions-like: one+ of `FnOnce` `FnMut` or `Fn` traits must be implemented too.
+```
+struct Cacher<T>
+    where T: Fn(u32) -> u32 // every closure will have to take a u32 and return a u32
+{
+    calculation: T,
+    value: Option<u32>,
+}
+
+impl<T> Cacher<T>
+    where T: Fn(u32) -> u32
+{
+    fn new(calculation: T) -> Cacher<T> {
+        Cacher {
+            calculation,
+            value: None,
+        }
+    }
+
+    fn value(&mut self, arg: u32) -> u32 {
+        match self.value {
+            Some(v) => {
+                if v == arg {
+                    v
+                } else {
+                    self.value = (self.calculation)(arg);
+                }
+            },
+            None => {
+                let v = (self.calculation)(arg);
+                self.value = Some(v);
+                v
+            },
+        }
+    }
+}
+```
+and called as:
+```
+fn generate_workout(intensity: u32, random_number: u32) {
+    let mut expensive_result = Cacher::new(|num| {
+        println!("calculating slowly...");
+        thread::sleep(Duration::from_secs(2));
+        num
+    });
+
+    if intensity < 25 {
+        println!("Today, do {} pushups!", expensive_result.value(intensity));
+        println!("Next, do {} situps!", expensive_result.value(intensity));
+    } else {
+        println!("Today, run for {} minutes!", expensive_result.value(intensity));
+    }
+}
+```
+Issue: value will be updated depending on the arg, could use a hashMap to store several results
+
 ## Processing with iterators (13.2)
+*Iterators* are a way of processing a series of elements. THey implement an `Iterator` trait and are defined as:
+```
+trait Iterator {
+    type Item;
+    fn next(&mut self) -> Option<Self::Item>; // unique mandatory function to define
+    // methods with default implementations elided
+}
+```
+`iter()` takes immutable references to the values, but `into_iter()` takes ownership and returns the owned values. If references are mutable, `iter_mut()` can be used
+##### Methods
+- Methods that consume the iterator = all methods that call `next()` like `sum()`: `let total: i32 = vec![1, 2, 3].iter().sum();`
+- Methods that produce other iterators = *iterator adaptors*: methods that changes iterators like `map()`: 
+```
+let v1: Vec<i32> = vec![1, 2, 3];
+let v2 = v1.iter().map(|x| x + 1).collect();
+```
+`collect()` has to be called since `map()` does not consume the iterator (just updates it). `collect()` consumes the iterator and returns a collection of the new data. 
+####### Iterators + closures: common use case
+```
+#[derive(PartialEq, Debug)]
+struct Shoe { size: u32, style: String, }
+
+fn shoes_in_my_size(shoes: Vec<Shoe>, shoe_size: u32) -> Vec<Shoe> {
+    shoes.into_iter().filter(|s| s.size == shoe_size).collect()
+}
+
+let shoes = vec![
+        Shoe { size: 10, style: String::from("sneaker") },
+        Shoe { size: 13, style: String::from("sandal") },
+        Shoe { size: 10, style: String::from("boot") },
+    ];
+
+let in_my_size = shoes_in_my_size(shoes, 10); // filters out size: 13 shoe from the vecArray
+```
+
+##### Creating iterators
+```
+struct Counter {
+    count: u32,
+}
+
+impl Counter {
+    fn new() -> Counter {
+        Counter { count: 0 }
+    }
+}
+
+impl Iterator for Counter {
+    type Item = u32;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.count += 1;
+
+        if self.count < 6 {
+            Some(self.count)
+        } else {
+            None
+        }
+    }
+}
+```
+This offers access to `.map()`, `.filter()`, `.sum()`, `.zip()`, `.skip()` etc, methods of `Iterator`
+
 ## Performances: loops vs iterators (13.4)
+Iterator are a *zero-cost abstrations* feature bc it is compiled down to low-level code. Rust *unrolls* loops.
+Iterators are slightly faster than loops
+
+
+# More about Cargo and Crates.io
+## Customize builds with release (14.1)
+Cargo has 2 main profiles: `dev` (used with `cargo build`) and `release` (`cargo build --release`)
+In *Cargo.toml* can be added [profile.*] sections as for example:
+```
+[profile.dev]
+opt-level = 1 // [0..3]
+```
+
+## Publish libraries to crates.io (14.2)
+Make useful documentation comments: `///` which support Markdown format
+Running `cargo doc --open` will generate a documentation from project code comments.
+Ex: 
+```
+/// Adds one to the number given.
+/// # Examples
+/// ```
+/// let five = 5;
+/// assert_eq!(6, my_crate::add_one(5));
+/// ```
+pub fn add_one(x: i32) -> i32 {
+    x + 1
+}
+```
+will create a doc with a side panel for the function name with information, signature, examples, etc. Common sections: Panics, Examples, Errors, Safety
+Running cargo test will run the code examples in your documentation as tests
+`//!` To add top-level (crate) doc comments. If put after a `///` it will add into the top-level doc section relative to a function
+##### Exporting as a Public API with `pub use`
+Internal structure can differ from public API
+`pub use` allows to avoid `use my_crate::some_module::another_module::UsefulType;` and rather do: `use my_crate::UsefulType;`
+A crate can have a nice hierarchy that is not convenient for public users: it is not requiered to (re)design it: `pub use` removes the internal organization from the public API and re-exports an item at the top-level. 
+Better to do this: `pub use kinds::PrimaryColor;` which re-exports and is accessible doing `use art::PrimaryColor;` ; than this:
+```
+pub mod utils {
+    use kinds::*;
+```
+which is obscure for a public user (and hidden from the doc).
+
+##### Set up crates.io account
+Create account on site, get an API token then do `cargo login API_KEY_VAL` (stored in *~/.cargo/credentials*) to be allowed to publish crates
+##### Crate metadatas
+*Cargo.toml*
+```
+[package]
+name = "guessing_game"
+version = "0.1.0"
+authors = ["Your Name <you@example.com>"]
+edition = "2018"
+description = "A fun game where you guess what number the computer has chosen." // display in search results
+license = "MIT OR Apache-2.0" // multiple licences is ok
+```
+If it is not a SPDX licence, create a *licence-file* and specify its name in the `licence=` field
+##### Publish, update, remove
+`cargo publish`
+To update a package: update the `version=` field from the *Cargo.toml* file (follow this convention *https://semver.org/*) then re-run `cargo publish`
+`cargo yank --vers 1.0.1` which can be undone: `cargo yank --vers 1.0.1 --undo` prevents every new project to starting to depend to that version. But projects that already used that version will continue to depend on it with no issue
+
+
+## Organize large projects with worspaces (14.3)
+It is the possibility to split up a package into multiple library crates that share the same *Cargo.lock* and output directory
+Several wyas to structure it, idiomatic one:
+library crate 1: `add_one` function
+library crate 2: `add_two` function
+binary crate depends on crate 1 & 2 and provides main functionality
+! There will only be a single, shared, *target* directory so not every crate has to be rebuilt every time
+##### Creation
+Create a folder for each *workspace* with a *Cargo.toml* file as:
+```
+add
+├── Cargo.lock
+├── Cargo.toml
+├── add-one
+│   ├── Cargo.toml
+│   └── src
+│       └── lib.rs
+├── adder
+│   ├── Cargo.toml
+│   └── src
+│       └── main.rs
+└── target
+```
+*adder/Cargo.toml* file:
+```
+[workspace]
+
+members = [
+    "adder",
+]
+```
+then run `cargo new adder` from the *adder* dir.
+Update top-level *Cargo.toml* as:
+```
+[workspace]
+members = [
+    "adder",
+    "add-one",
+]
+```
+run `cargo new add-one --lib` from the *add-one* lib dir
+Add a `pub fn add_one()` in the *add-one/src/lib.rs*
+Add to *adder/Cargo.toml* the following:
+```
+[dependencies]
+add-one = { path = "../add-one" }
+```
+In *adder/src/main.rs* add-one can now be called as:
+```
+use add_one;
+
+fn main() {
+    println!("{}, add_one::add_one(10));
+}
+```
+Now it is possible to ruin `cargo build` in the top-level *add* directory... and run it with `cargo run -p adder`
+###### Add external crate to a workspace
+To make an external crate available to a workspace with `use cratename;`, add this to *workspace/Cargo.toml* file:
+```
+[dependencies]
+rand = "0.3.14"
+```
+###### Add testing to a workspace
+In *add-one/src/lib.rs* add:
+```
+pub fn add_one(x: i32) -> i32 { /// already added
+    x + 1
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn it_works() {
+        assert_eq!(3, add_one(2));
+    }
+}
+```
+Run `cargo test` in top-level *add* dir will test sub-workspaces too or `cargo test -p add-one` to test a specific crate
+###### Publish to crates.io
+run `cargo publish` on every crate dir, not just on the top-level
+
+## Install and run binaries from crates.io (14.4)
+`cargo install` allows to install and use binary crates locally. They are located 
+Crate can either be a library (not runnable but suited to fit in other programs), has a binary target (runnable program if there is a *src/main.rs*) or both
+If a binary is in the `$PATH`, it can be run with `cargo somebinary`
