@@ -1055,7 +1055,7 @@ let v1: Vec<i32> = vec![1, 2, 3];
 let v2 = v1.iter().map(|x| x + 1).collect();
 ```
 `collect()` has to be called since `map()` does not consume the iterator (just updates it). `collect()` consumes the iterator and returns a collection of the new data. 
-####### Iterators + closures: common use case
+###### Iterators + closures: common use case
 ```
 #[derive(PartialEq, Debug)]
 struct Shoe { size: u32, style: String, }
@@ -1251,3 +1251,110 @@ run `cargo publish` on every crate dir, not just on the top-level
 `cargo install` allows to install and use binary crates locally. They are located 
 Crate can either be a library (not runnable but suited to fit in other programs), has a binary target (runnable program if there is a *src/main.rs*) or both
 If a binary is in the `$PATH`, it can be run with `cargo somebinary`
+
+
+# SMART POINTERS (15)
+Data structures that have useful methods, have their core data on the heap and can share ownership.
+
+## Box to point to data on the heap (15.1)
+Boxes do not have capabilities, simple and light (no overhead) smart pointer. They implement the `Deref` and `Drop` traits.
+###### Allocation
+`let b = Box::new(5);` b contains a pointer to the value `5(i32)` allocated on the heap. Like stack data both the data and the pointer will be deallocated once out of scope
+###### The `Cons` list
+Receives a pair of arguments, the value of the current item and the next item. The last item has a `Nil` value without a next item
+Not common in Rust to treat list of items (`Vec<T>` is better most of the times)
+```
+enum List {
+    Cons(i32, List), //  will not compile: Cons(i32, Box<List>), would work
+    Nil,
+}
+```
+This list is recursive so rust cannot guess its type and the compiler will not compile. Using a `Box<List>` would work because only a pointer will be stored on the stack, the unknown size (list) will be on the heap
+
+## `Deref` trait to treat smart pointers like references
+Implementing the `Deref` trait allows to customize the dereference operator (`*`), therefore allows for smart pointers to work like a reference. It allows to deference something that is not a ref. Derefencing (`*`) means pointing to the value of a reference (like in C).
+```
+let x = 5;
+let s = &x;
+let h = Box::new(x);
+
+assert_eq!(x, *s); // are equal
+assert_eq!(*s, *h); // are equal, would not be possible to use `*` without the Deref trait
+```
+###### Implement the `Deref` trait on a struct
+```
+use std::ops::Deref;
+
+struct MyBox<T>(T);
+
+impl<T> MyBox<T> {
+    fn new(x: T) -> MyBox<T> {
+        MyBox(x)
+    }
+}
+
+impl<T> Deref for MyBox<T> {
+    type Target = T;
+
+    fn deref(&self) -> &T {
+        &self.0
+    }
+```
+So doing `*h` == `*(h.deref())`
+Note that `deref()` has to return a ref and not a value so `self` keeps the ownership
+###### *deref coercion*
+Happens automatically when a ref to a type's value is passed to a function that was waiting for another type of parameter. It converts into the right type using `deref()`. So code can work bot with references and smart pointers. Like `&MyBox<String>` -> `&String` -> `&str`. With/out *deref coercion*:
+```
+let m = MyBox::new(String::from("Rust"));
+hello(&(*m)[..]); // without
+hello(&m); // with
+```
+`*m` dereferences `MyBox<String>` into `String` and `[..]` turns the `String` into a string slice.
+###### mutable *deref coercion*: `DerefMut`
+When `T: DerefMut<Target=U>` is implemented, `&mut T` will be converted to `&mut U`. But can too convert `&mut T` to `&U`: Rust can coerce a mutable into an immutable ref (not the opposite as it would break the borrowing rules).
+## Running code on cleanup with the `Drop` Trait
+= customized code ran when a value gets out of scope. Ex: `Box<T>` customizes `Drop` to deallocate the space on the heap.
+###### Implementation
+```
+struct CustomSmartPointer {
+    data: String,
+}
+
+impl Drop for CustomSmartPointer {
+    fn drop(&mut self) {
+        println!("Instance drops!");
+    }
+}
+```
+`println` will be called when an instance is out of scope. No need to bring `Drop` into scope as it is in the prelude
+Variables are dropped in the reverse orer of their creation
+##### Drop a value early
+Can be useful when using locks for example. Calling `Drop::drop()` would not compile, `std::mem::drop()` needs to be called instead. It takes the variable to drop as a parameter and call the `Drop::drop()` function. Do not be scared to drop too early, Rust checks valid references so the compiler would yell.
+
+## `Rc<T>`: reference counted smart pointer
+Design to work with multiple ownership pointing to a heap data and it cannot be determine a t compile time which part will finish using the data last. Its purpose is to keep count of every active reference to determine whether or not a value is still in use.
+Allows to have multiple immutable references (that point to mutable data on the heap ?)
+Note: `Rc` works only on single-threaded scenarios.
+```
+enum List {
+    Cons(i32, Rc<List>),
+    Nil,
+}
+
+use List::{Cons, Nil};
+use std::rc::Rc;
+
+fn main() {
+    let a = Rc::new(Cons(5, Rc::new(Cons(10, Rc::new(Nil)))));
+    let b = Cons(3, Rc::clone(&a)); // unidiomatic: a.clone()
+    let c = Cons(4, Rc::clone(&a)); // unidiomatic: a.clone()
+}
+```
+Each call to `Rc::clone()` will increase the count, and the data will only cleaned up once count = 0. Count is automatically decreased
+`Rc::strong_count(&a)` returns the active count
+## `RefCell<T>` and the interior mutability pattern
+*Interior mutability* is a design pattern that allow mutability of data attached to immutable references. Uses `unsafe` code to workaround Rust's rules. Single ownership to the data. Useful when you can guarantee your program will work but the compiler cannot ensure it.
+Borrowing rules: a program can have either (but not both of) one mutable reference or any number of immutable references. References must always be valid. But unlike `Box<T>`, for `RefCell<T>` these rules are applied at *runtime*, not *compile time* and will cause to panic and exit. Consequence: slower and not errors/memory-safe.
+
+##### Interior Mutability: A Mutable Borrow to an Immutable Value
+
