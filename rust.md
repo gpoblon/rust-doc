@@ -950,6 +950,7 @@ fn it_adds_two() {
     assert_eq!(4, adder::add_two(2));
 }
 ```
+
 ###### Integration tests for binary crates
 Rust projects that provide a binary have a straightforward src/main.rs file that calls logic that lives in the src/lib.rs file.
 Doing so allows to have *integration test*. It is not possible to `use` elements of a *src/main.rs* file: binary crates are meant to run on their own
@@ -970,6 +971,7 @@ let expensive_closure = |param1, param2| { // |param1: u32, param2: u32| -> u32 
 `expensive_closure` contains the definition of the function not its result. It is called the same way a function is
 Annotate types is not needed (but possible), types are infered bc unlike functions closure are not interfaces exposed to users
 ! The compiler infers types & traits at first call so recalling a closure with different param types will not compile
+
 ###### Closures capture their environment
 Closure have, like functions, at least on of these traits that are inferred depending on what a closure does of its environment variables:
 - `FnOnce` takes ownership and consumes the environment variables, meaning this closure can only be called once
@@ -979,6 +981,7 @@ Closure have, like functions, at least on of these traits that are inferred depe
     Implemented if the closure do not move the captured variables
 - `Fn` borrows values from the environment immutably
     Implemented for closures that do not need mutable access to the captured variables
+
 ###### Storing closures and their result
 This is known as *cache, memoization, lazy evaluation*. The solution is to store both the closure and its result in a struct. Whatever their signature is closures will have different types so solution is to consider them generics. 
 Closures are functions-like: one+ of `FnOnce` `FnMut` or `Fn` traits must be implemented too.
@@ -1047,6 +1050,7 @@ trait Iterator {
 }
 ```
 `iter()` takes immutable references to the values, but `into_iter()` takes ownership and returns the owned values. If references are mutable, `iter_mut()` can be used
+
 ##### Methods
 - Methods that consume the iterator = all methods that call `next()` like `sum()`: `let total: i32 = vec![1, 2, 3].iter().sum();`
 - Methods that produce other iterators = *iterator adaptors*: methods that changes iterators like `map()`: 
@@ -1054,7 +1058,8 @@ trait Iterator {
 let v1: Vec<i32> = vec![1, 2, 3];
 let v2 = v1.iter().map(|x| x + 1).collect();
 ```
-`collect()` has to be called since `map()` does not consume the iterator (just updates it). `collect()` consumes the iterator and returns a collection of the new data. 
+`collect()` has to be called since `map()` does not consume the iterator (just updates it). `collect()` consumes the iterator and returns a collection of the new data
+
 ###### Iterators + closures: common use case
 ```
 #[derive(PartialEq, Debug)]
@@ -1107,6 +1112,7 @@ Iterators are slightly faster than loops
 
 
 # More about Cargo and Crates.io
+
 ## Customize builds with release (14.1)
 Cargo has 2 main profiles: `dev` (used with `cargo build`) and `release` (`cargo build --release`)
 In *Cargo.toml* can be added [profile.*] sections as for example:
@@ -1133,6 +1139,7 @@ pub fn add_one(x: i32) -> i32 {
 will create a doc with a side panel for the function name with information, signature, examples, etc. Common sections: Panics, Examples, Errors, Safety
 Running cargo test will run the code examples in your documentation as tests
 `//!` To add top-level (crate) doc comments. If put after a `///` it will add into the top-level doc section relative to a function
+
 ##### Exporting as a Public API with `pub use`
 Internal structure can differ from public API
 `pub use` allows to avoid `use my_crate::some_module::another_module::UsefulType;` and rather do: `use my_crate::UsefulType;`
@@ -1146,6 +1153,7 @@ which is obscure for a public user (and hidden from the doc).
 
 ##### Set up crates.io account
 Create account on site, get an API token then do `cargo login API_KEY_VAL` (stored in *~/.cargo/credentials*) to be allowed to publish crates
+
 ##### Crate metadatas
 *Cargo.toml*
 ```
@@ -1158,11 +1166,11 @@ description = "A fun game where you guess what number the computer has chosen." 
 license = "MIT OR Apache-2.0" // multiple licences is ok
 ```
 If it is not a SPDX licence, create a *licence-file* and specify its name in the `licence=` field
+
 ##### Publish, update, remove
 `cargo publish`
 To update a package: update the `version=` field from the *Cargo.toml* file (follow this convention *https://semver.org/*) then re-run `cargo publish`
 `cargo yank --vers 1.0.1` which can be undone: `cargo yank --vers 1.0.1 --undo` prevents every new project to starting to depend to that version. But projects that already used that version will continue to depend on it with no issue
-
 
 ## Organize large projects with worspaces (14.3)
 It is the possibility to split up a package into multiple library crates that share the same *Cargo.lock* and output directory
@@ -1171,6 +1179,7 @@ library crate 1: `add_one` function
 library crate 2: `add_two` function
 binary crate depends on crate 1 & 2 and provides main functionality
 ! There will only be a single, shared, *target* directory so not every crate has to be rebuilt every time
+
 ##### Creation
 Create a folder for each *workspace* with a *Cargo.toml* file as:
 ```
@@ -1220,12 +1229,14 @@ fn main() {
 }
 ```
 Now it is possible to ruin `cargo build` in the top-level *add* directory... and run it with `cargo run -p adder`
+
 ###### Add external crate to a workspace
 To make an external crate available to a workspace with `use cratename;`, add this to *workspace/Cargo.toml* file:
 ```
 [dependencies]
 rand = "0.3.14"
 ```
+
 ###### Add testing to a workspace
 In *add-one/src/lib.rs* add:
 ```
@@ -1244,6 +1255,7 @@ mod tests {
 }
 ```
 Run `cargo test` in top-level *add* dir will test sub-workspaces too or `cargo test -p add-one` to test a specific crate
+
 ###### Publish to crates.io
 run `cargo publish` on every crate dir, not just on the top-level
 
@@ -1281,6 +1293,7 @@ let h = Box::new(x);
 assert_eq!(x, *s); // are equal
 assert_eq!(*s, *h); // are equal, would not be possible to use `*` without the Deref trait
 ```
+
 ###### Implement the `Deref` trait on a struct
 ```
 use std::ops::Deref;
@@ -1302,6 +1315,7 @@ impl<T> Deref for MyBox<T> {
 ```
 So doing `*h` == `*(h.deref())`
 Note that `deref()` has to return a ref and not a value so `self` keeps the ownership
+
 ###### *deref coercion*
 Happens automatically when a ref to a type's value is passed to a function that was waiting for another type of parameter. It converts into the right type using `deref()`. So code can work bot with references and smart pointers. Like `&MyBox<String>` -> `&String` -> `&str`. With/out *deref coercion*:
 ```
@@ -1310,10 +1324,13 @@ hello(&(*m)[..]); // without
 hello(&m); // with
 ```
 `*m` dereferences `MyBox<String>` into `String` and `[..]` turns the `String` into a string slice.
+
 ###### mutable *deref coercion*: `DerefMut`
-When `T: DerefMut<Target=U>` is implemented, `&mut T` will be converted to `&mut U`. But can too convert `&mut T` to `&U`: Rust can coerce a mutable into an immutable ref (not the opposite as it would break the borrowing rules).
+When `T: DerefMut<Target=U>` is implemented, `&mut T` will be converted to `&mut U`. But can too convert `&mut T` to `&U`: Rust can coerce a mutable into an immutable ref (not the opposite as it would break the borrowing rules)
+
 ## Running code on cleanup with the `Drop` Trait
-= customized code ran when a value gets out of scope. Ex: `Box<T>` customizes `Drop` to deallocate the space on the heap.
+= customized code ran when a value gets out of scope. Ex: `Box<T>` customizes `Drop` to deallocate the space on the heap
+
 ###### Implementation
 ```
 struct CustomSmartPointer {
@@ -1328,6 +1345,7 @@ impl Drop for CustomSmartPointer {
 ```
 `println` will be called when an instance is out of scope. No need to bring `Drop` into scope as it is in the prelude
 Variables are dropped in the reverse orer of their creation
+
 ##### Drop a value early
 Can be useful when using locks for example. Calling `Drop::drop()` would not compile, `std::mem::drop()` needs to be called instead. It takes the variable to drop as a parameter and call the `Drop::drop()` function. Do not be scared to drop too early, Rust checks valid references so the compiler would yell.
 
@@ -1352,9 +1370,257 @@ fn main() {
 ```
 Each call to `Rc::clone()` will increase the count, and the data will only cleaned up once count = 0. Count is automatically decreased
 `Rc::strong_count(&a)` returns the active count
+
 ## `RefCell<T>` and the interior mutability pattern
 *Interior mutability* is a design pattern that allow mutability of data attached to immutable references. Uses `unsafe` code to workaround Rust's rules. Single ownership to the data. Useful when you can guarantee your program will work but the compiler cannot ensure it.
-Borrowing rules: a program can have either (but not both of) one mutable reference or any number of immutable references. References must always be valid. But unlike `Box<T>`, for `RefCell<T>` these rules are applied at *runtime*, not *compile time* and will cause to panic and exit. Consequence: slower and not errors/memory-safe.
+Borrowing rules: a program can have either (but not both of) one mutable reference or any number of immutable references. References must always be valid. But unlike `Box<T>`, for `RefCell<T>` borrowing rules are applied at *runtime* rather than *compile time* and will cause to panic and exit. Consequence: slower and not errors/memory-safe.
+Rules reminder: `RefCell<T>` allows to have many immutable borrows OR one mutable borrow at any point in time.
+If two mut are borrowed panic message will be: `already borrowed: BorrowMutError`
 
-##### Interior Mutability: A Mutable Borrow to an Immutable Value
+##### Interior Mutability: A mutable borrow to an immutable value
+If a function uses a trait that does not allow mutability but mutability is required. `RefCell` will wrap the variable and allow for mutability by calling `borrow_mut()` (returns a `RefMut<T>`) and `borrow()` (increases its count and returns a `Ref<T>`) methods
+Works well for *mock objects*
 
+##### Having multiple owners of mutable data by combining `Rc<T>` and `RefCell<T>`
+`Rc<T>` allows to have multiple owners who are limited to an immutable access... Unless `Rc<T>` holds a `RefCell<T>`. Would look like:
+init a list of: `Rc<RefCell<i32>>;`, `let value = Rc::new(RefCell::new(5));` and create clones of `let a = Rc::new(Cons(Rc::clone(&value), Rc::new(Nil)));` then `*value.borrow_mut() += 10;`: every clone has the same `value` value as `a`
+Interior mutability can also be provided by `Cell<T>` (which copies the value instead nof giving references to the inner value) or `Mutex<T>` (which is safe across threads)
+
+## Reference cycles can leak memory
+Ex: using `Rc<T>` and `RefCell<T>` where items refer to each other in a cycle = memory leaks, ref count will never reach 0 -> values will never be dropped:
+```
+let a = Rc::new(Cons(5, RefCell::new(Rc::new(Nil))));
+let b = Rc::new(Cons(10, RefCell::new(Rc::clone(&a))));
+if let Some(link) = a.tail() {
+    *link.borrow_mut() = Rc::clone(&b);
+}
+```
+Solution: pay attention to this as there is no Rust safety or have cycles made up of some ownership and of some non-ownership relationships, and only the ownership relationships affect whether or not a value can be dropped
+
+##### Prevent reference cycles by turning an `Rc<T>` into a `Weak<T>`
+It is also possible to create a *weak reference*(`Rc::downgrade` creates a `Weak<T>` that increases the `weak_count`: unlike `strong_count` the `Rc` instance can be cleaned up even if `weak_count` is not 0). So creating weak ref cycles is safer as it will be broken once strong reference comes down to 0. But since `Weak<T>` value pointer might have been dropped it has to be checked by calling
+
+###### Create a tree data structure: a `Node` with child nodes
+```
+struct Node {
+    value: i32,
+    children: RefCell<Vec<Rc<Node>>>,
+}
+```
+
+```
+use std::rc::{Rc, Weak};
+use std::cell::RefCell;
+
+#[derive(Debug)]
+struct Node {
+    value: i32,
+    parent: RefCell<Weak<Node>>,
+    children: RefCell<Vec<Rc<Node>>>,
+}
+
+fn main() {
+    let leaf = Rc::new(Node {
+        value: 3,
+        parent: RefCell::new(Weak::new()),
+        children: RefCell::new(vec![]),
+    });
+
+    let branch = Rc::new(Node {
+        value: 5,
+        parent: RefCell::new(Weak::new()),
+        children: RefCell::new(vec![Rc::clone(&leaf)]),
+    });
+
+    *leaf.parent.borrow_mut() = Rc::downgrade(&branch);
+
+    println!("leaf parent = {:?}", leaf.parent.borrow().upgrade());
+}
+```
+Doing this allows parent to own a mutable reference to the child Node and a `Weak<T>` ref (does not own) from the child to the parent so that parent can drop child (not the other way) and there is no refence cycle
+
+# FEARLESS CONCURRENCY
+Rust handles threads as a 1:1 relation with operating system threads but M:N relation has been made possible through crates.
+Issues Rust ownership / concurrency system prevents from happening:
+*Deadlocks* = both threads are waiting for each other preventing both threads from continuying
+*Race conditions* = threads are accessing data in an inconsistent order
+Bugs hard to reproduce
+
+## Threads
+`thread::spawn()` takes a closure and executes code in a new thread
+```
+use std::thread;
+use std::time::Duration;
+
+fn main() {
+    let handle = thread::spawn(|| {
+        for i in 1..10 {
+            println!("hi number {} from the spawned thread!", i);
+            thread::sleep(Duration::from_millis(1));
+        }
+    });
+
+    handle.join().unwrap();
+
+    for i in 1..5 {
+        println!("hi number {} from the main thread!", i);
+        thread::sleep(Duration::from_millis(1));
+    }
+}
+```
+will print every `handle` then main thread.
+If `handle.join()`had been called after the main for there zould have been 2 `println!` running concurrently.
+Without `handle.join()` the program would have ended with the main thread, without waiting for the `handle` thread to end.
+
+##### Ownership system of threads
+`move` closure trait allows to borrow or take ownership (?) of variables called within the closure (`let handle = thread::spawn(move || {`)
+Be careful, a variable passed to a `move` thread cannot be accessed in its former context
+
+## Using message passing to transfer data between threads
+Channels allow to send messages from several producers to an end
+```
+use std::thread;
+use std::sync::mpsc;
+
+fn main() {
+    let (tx, rx) = mpsc::channel();
+
+    thread::spawn(move || {
+        let val = String::from("hi");
+        tx.send(val).unwrap();
+    });
+
+    let received = rx.recv().unwrap();
+    println!("Got: {}", received);
+}
+```
+Note that receiving can be done with `recv()` (will block the main thread's execution and wait for a value) and `try_recv()` (non-bloquant version of `recv()` that returns a `Result<T>
+```
+let (tx, rx) = mpsc::channel();
+
+let tx1 = mpsc::Sender::clone(&tx); // tx1 becomes another producer of messages alongside tx
+thread::spawn(move || {
+    let vals = vec![
+        String::from("hi"),
+        String::from("from"),
+        String::from("the"),
+        String::from("thread"),
+    ];
+
+    for val in vals {
+        tx1.send(val).unwrap();
+        thread::sleep(Duration::from_secs(1));
+    }
+});
+
+thread::spawn(move || {
+    let vals = vec![
+        String::from("more"),
+        String::from("messages"),
+        String::from("for"),
+        String::from("you"),
+    ];
+
+    for val in vals {
+        tx.send(val).unwrap();
+        thread::sleep(Duration::from_secs(1));
+    }
+});
+
+for received in rx { // acts as blocking recv() calls
+    println!("Got: {}", received);
+}
+```
+The `for` from the main will wait for messages to come and will print both thread messages concurrently
+! Once a variabe has been sent its ownership is transmitted, therefore it is no longer accessible in the current scope / thread
+
+## Shared-state concurrency
+## Extensible concurrency: `Sync` and `Send` traits
+
+# Object oriented programming features of Rust (17)
+It is a design pattern in which objects pass messages to each other
+Rust is influenced by many programming paradigms including OOP and functional
+
+## Characteristics of object-oriented languages (17.1)
+Objects, encapsulation, inheritance are features OOP / Rust share
+Depending on the definition Rust is/not an OOP language or not
+
+##### Objects contain data and behavior
+OOP definition (one of many) that tends to define Rust as OOP (objects = `struct` & `enum`, since `impl` block provides methods):
+> "Object-oriented programs are made up of objects. An object packages both data and the procedures that operate on that data. The procedures are typically called methods or operations."
+
+##### Encapsulation that hides implementation details
+
+
+##### Inheritance as a types system and as code sharing
+Polymorphism != Inheritance: polymorphism = general concept: code that code work with data of multiple types
+
+## Using trait .... sur tmp pc (17.2)
+
+## Implemting an object-oriented design pattern: the *state pattern*
+*state object* means a value has both an internal state and a private value that can only be updated through its public methods. Each method updates the state value which is `Some(<Box>)`
+Example: a `Post` crate that allows to create a Post draft, wait for its review and publish it once it has been reviewed. The post cannot be published before, and its content will be empty until publication
+```
+use blog::Post;
+
+fn main() {
+    let mut post = Post::new();
+    post.add_text("I ate a salad for lunch today");
+    post.request_review();
+    assert_eq!("", post.content()); // post content is still empty
+    post.approve();
+    assert_eq!("I ate a salad for lunch today", post.content()); // post has been published
+}
+```
+Here we can only access the `Post` type, that has an internal value and three mathods that are the only way to update the instance state and content changes
+definition of public struct Post:
+```
+pub struct Post {
+    state: Option<Box<dyn State>>,
+    content: String,
+}
+
+impl Post {
+    pub fn new() -> Post {
+        Post {
+            state: Some(Box::new(Draft {})),
+            content: String::new(),
+        }
+    }
+
+    pub fn content(&self) -> &str {
+        ""
+    }
+    
+    pub fn add_text(&mut self, text: &str) {
+        self.content.push_str(text);
+    }
+
+    pub fn request_review(&mut self) {
+        if let Some(s) = self.state.take() { // if state != none: take the value out of the option, put it in `s` and consume the current state ...
+            self.state = Some(s.request_review()) // ... update and return a new state
+        }
+        // cannot do it in a one line operation as we need to get ownership of the `state` value
+    }
+}
+
+trait State {
+    fn request_review(self: Box<Self>) -> Box<dyn State>;
+    // the method is only valid when cvalled on a `Box` holding the type
+    // the method takes ownership of the `Box<Self>` (state value) to update the state of the `Post`
+}
+
+struct Draft {}
+impl State for Draft {
+    fn request_review(self: Box<Self>) -> Box<dyn State> {
+        Box::new(PendingReview {})
+    }
+}
+
+struct PendingReview {}
+impl State for PendingReview {
+    fn request_review(self: Box<Self>) -> Box<dyn State> {
+        self
+    }
+}
+```
