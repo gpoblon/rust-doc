@@ -2,6 +2,7 @@
 
 # Side Notes
 - Statements vs expressions: statements perform an action but do not return a value. Expr evaluate to a resulting value. But expressions can be part of statements (ex: `6` expr from `let = 6;` statement).
+- Generic type works best for homogeneous collections whether trait bounds works best with multiple possible types.
 
 # Code Conventions
 - variables are snake case (lowercase + underscore)
@@ -1550,12 +1551,94 @@ OOP definition (one of many) that tends to define Rust as OOP (objects = `struct
 > "Object-oriented programs are made up of objects. An object packages both data and the procedures that operate on that data. The procedures are typically called methods or operations."
 
 ##### Encapsulation that hides implementation details
-
-
-##### Inheritance as a types system and as code sharing
 Polymorphism != Inheritance: polymorphism = general concept: code that code work with data of multiple types
+Encapsulation means only the public API of an object can be reached, its internals are not and can be changed transparently.
+Rust feature allowing encapsulation is the `pub` keyword, by default modules types functions and methods are private
 
-## Using trait .... sur tmp pc (17.2)
+##### Inheritance as a type system and as code sharing
+Inheritance meaning can be either: reuse of code or polymorphism (code that can work with data of multiple types)
+There is no inheritance feature in Rust but traits allow to share methods implementation and generics abstracts over possible types (*bounded parametric polymorphism*)
+
+## Using trait objects that allow for values of different types (17.2)
+Example: a `gui` crate that allows to draw components such as `Button`, `Image`, `SelectBox` or whatever the user would want to integrate
+An OOP implementation would be to define a parent class named `component` that implements a `draw` method. Its children would be `Image` etc and inherit, overwrite `draw`. Rust equivalent:
+
+##### Define a trait for common behavior
+Parenthesis: `enum` and `struct` have methods and data separated but traits are more like objects as they combine data and behavior. But they have a specific purpose: allow abstraction across common behavior
+
+Define a `Draw` trait that will have a `draw` method: 
+```
+pub trait Draw {
+    fn draw(&self);
+}
+
+pub struct Screen {
+    pub components: Vec<Box<dyn Draw>>,
+}
+
+impl Screen {
+    pub fn run(&self) {
+        for component in self.components.iter() {
+            component.draw();
+        }
+    }
+}
+
+pub struct Button {
+    pub width: u32,
+    pub height: u32,
+    pub label: String,
+}
+
+impl Draw for Button {
+    fn draw(&self) {
+        // code to actually draw a button
+    }
+}
+```
+`Vec<Box<dyn Draw>>>` stands-in for any type inside a Box that has to implement the `Draw` trait. Generic types would not work here bc only 1 type could be called (Buttons for example) whereas at runtime traits allow for multiple concrete types.
+
+To add something to draw, simply declare a struct:
+```
+use gui::{Draw, Screen, Button};
+
+struct SelectBox {
+    width: u32,
+    height: u32,
+    options: Vec<String>,
+}
+
+impl Draw for SelectBox {
+    fn draw(&self) {
+        // code to actually draw a select box
+    }
+}
+
+
+fn main() {
+    let screen = Screen {
+        components: vec![
+            Box::new(SelectBox {
+                width: 75,
+                height: 10,
+                options: vec![
+                    String::from("Yes"),
+                    String::from("Maybe"),
+                    String::from("No")
+                ],
+            }),
+            Box::new(Button {
+                width: 50,
+                height: 10,
+                label: String::from("OK"),
+            }),
+        ],
+    };
+
+    screen.run();
+}
+```
+If a `Box::new()` call does not implement the `Draw` trait it will not compile
 
 ## Implemting an object-oriented design pattern: the *state pattern*
 *state object* means a value has both an internal state and a private value that can only be updated through its public methods. Each method updates the state value which is `Some(<Box>)`
