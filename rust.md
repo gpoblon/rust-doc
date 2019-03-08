@@ -1803,3 +1803,70 @@ impl State for PendingReview {
 }
 ```
 
+# PATTERNS AND MATCHING (18)
+Patterns are a syntax for matching against values. If the value does not fit the shape of the pattern, the code associated with the pattern will not run
+## Use cases
+##### `match` arms
+! must be exhaustive (all possible expressions must be accounted for. Catchall patterns like `_` help)
+```
+match VALUE { // match x {
+    PATTERN => EXPRESSION, // 1 => println!("one"),
+    PATTERN => EXPRESSION,
+}
+```
+`_` will match anything but will never bind to a variable
+##### Conditional `if let` expressions
+Mainly is a shortcut for a `match` of only one case
+Compatible with `else`, `else if` or even `else if let`
+```
+let favorite_color: Option<&str> = None;
+if let Some(color) = favorite_color {
+    println!("Using your favorite color, {}, as the background", color);
+}
+```
+Shows the correct syntax but condition is not met.
+Note that `if let` creates a scope, so be careful to shadowing
+`if let` downside: exhaustiveness is not checked (ie `else` is not mandatory) which is a source of logical bugs
+
+##### `while let` conditional loops
+##### `for` loops
+##### `let` statements
+##### function parameters
+
+## Refutability: whether a pattern might fail to match
+Patterns can either be:
+- Irrefutable: ie they match for *any* possible value. `let x = 5;` -> x can hold every value possible. Function params, `let` statements, `for` loops can only accept irrefutable patterns bc otherwise programs could not work safely
+- Refutable: ie some values are not handled. Ex: `if let Some(x) = val` if `val` equals `None` pattern will not match. `if let` and `while let` can only accept refutable patterns bc they are made to handle possible failure
+Consequence: `let Some(x) = some_option_value;` cannot compile and would error `refutable pattern in local binding: 'None' not covered`. `if let` is nice when  we have a refutable pattern where an irrefutable pattern is needed
+The other way other does not make sense and will not compile: `if let x = 5;` will error: `irrefutable if-let pattern`
+
+## All the pattern syntax
+##### Matching literals
+`match x { 1 => println!("one"), }`
+##### Matching named variables
+It is actually an issue bc match starts a new scope so var names will be shadowed
+```
+let x = Some(5);
+let y = 10;
+
+match x {
+    Some(y) => println!("Matched, y = {:?}", y),
+    // y is a new variable that can take any value, will match wil x (Some(5)) and will print y = 5
+}
+
+println!("at the end: x = {:?}, y = {:?}", x, y); // will output x = Some(5), y = 10
+```
+Solution: use *match guards* conditional (later section)
+
+##### Multiple patterns and ranges of values
+`|` syntax means *or*.
+`...` allows to match an inclusive range of values. Only allowed for numeric values and `char` values.
+```
+match x {
+    1 | 2 => println!("one or two"),
+    2 ... 5 => println!("2 | 3 | 4 | 5"),
+    _ => println!("anything else"),
+}
+```
+##### Destructuring to break apart values
+Patterns can be used to destructure structs, enums, tuples and references
