@@ -1443,9 +1443,9 @@ Doing this allows parent to own a mutable reference to the child Node and a `Wea
 # FEARLESS CONCURRENCY
 Rust handles threads as a 1:1 relation with operating system threads but M:N relation has been made possible through crates.
 Issues Rust ownership / concurrency system prevents from happening:
-*Deadlocks* = both threads are waiting for each other preventing both threads from continuying
-*Race conditions* = threads are accessing data in an inconsistent order
-Bugs hard to reproduce
+- *Deadlocks* = both threads are waiting for each other preventing both threads from continuying
+- *Race conditions* = threads are accessing data in an inconsistent order
+- Bugs hard to reproduce
 
 ## Threads
 `thread::spawn()` takes a closure and executes code in a new thread
@@ -1536,7 +1536,102 @@ The `for` from the main will wait for messages to come and will print both threa
 ! Once a variabe has been sent its ownership is transmitted, therefore it is no longer accessible in the current scope / thread
 
 ## Shared-state concurrency
+##### Mutexes: allow access to dat from one thread at a time
+Mutex is a shortcut for mutual exclusion: it only allows access (asking for the lock) to some data one thread at a time
+Usage rules:
+- Attempt to access the lock before using the data
+- Unlock the data after using it so other threads can acquire the lock
+Rust advantage: no risk to get un/locking wrong
+Mutexes provide interior mutability like `RefCell<T>` so mutex is immutable but we can get a mutable ref of the data it contains
+! Mutexes can lead to deadlocks (two threads waiting for each other forever bc 2 locks are needed for them)
+##### `Mutex<T>` (smart pointer) API
+```
+use std::sync::Mutex;
+
+fn main() {
+    let m = Mutex::new(5);
+
+    {
+        let mut num = m.lock().unwrap();
+        *num = 6;
+    }
+
+    println!("m = {:?}", m);
+}
+```
+`.unwrap()` is important to make the thread panic if a lock fails
+`.lock()` returns a smart pointer called *MutexGuard* with the `Deref` trait to point to inner data + `Drop` trait to release the lock automatically when a *MutexGuard* goes out of scope
+##### Share `Mutex<T>` between multiple threads
+```
+use std::sync::Mutex;
+use std::thread;
+
+fn main() {
+    let counter = Mutex::new(0);
+    let mut handles = vec![];
+
+    for _ in 0..10 {
+        let handle = thread::spawn(move || {
+            let mut num = counter.lock().unwrap();
+
+            *num += 1;
+        });
+        handles.push(handle);
+    }
+
+    for handle in handles {
+        handle.join().unwrap();
+    }
+
+    println!("Result: {}", *counter.lock().unwrap());
+}
+```
+Will not compile bc Rust prevents from moving *counter* (the mutex) ownership into multiple threads
+Could solution be: `Rc<T>` to have multiple owners, remplacing `let counter = Mutex::new(0);` by `let counter = Rc::new(Mutex::new(0));` and calling `let counter = Rc::clone(&counter);` on each iteration ?
+No, it would not work bc `Rc<T>` is not safe to share across threads (reference count calls are done non-concurrently so they could be interrupted by another thread so Rust prevents it)
+Real solution: `Arc<T>`
+##### Atomic reference counting with `Arc<T>`
+Atomic work just like primitives (here `Rc<T>`) but are cross-thread safe and come with a performance cost
+Final result: 
+```
+use std::sync::{Mutex, Arc};
+use std::thread;
+
+fn main() {
+    let counter = Arc::new(Mutex::new(0));
+    let mut handles = vec![];
+
+    for _ in 0..10 {
+        let counter = Arc::clone(&counter);
+        let handle = thread::spawn(move || {
+            let mut num = counter.lock().unwrap();
+
+            *num += 1;
+        });
+        handles.push(handle);
+    }
+
+    for handle in handles {
+        handle.join().unwrap();
+    }
+
+    println!("Result: {}", *counter.lock().unwrap());
+}
+```
+
 ## Extensible concurrency: `Sync` and `Send` traits
+Rust has very few built-in concurrency features so look at crates / standard library / yourself
+Built-in are `std::marker` traits `Sync` and `Send`
+
+##### Allowing transference of ownership between threads with `Send`
+Indicates that the ownership of the type implementing `Send` can be transferred across threads.
+Almost every type *is* `Send` (ie implements `Send`). Exceptions: raw pointers; `Rc<T>` to avoid 2 threads updating the reference count at the same time. So Rust prevents using `Rc<T>` across threads, erroring: `the trait Send is not implemented for Rc<Mutex<i32>>`
+##### Allowing access from multiple threads with `Sync`
+Indicates that it is safe for a type that is `Sync` to be referenced from multiple threads
+If a `&T` is `Send` then it is `Sync` too
+Almost every type is `Sync` too (every primitives). Exceptions: `Cell<T>` related types (bc of runtime borrowing impl is not thread-safe), `Rc<T>` (bc of the same reason `Send` is not)
+##### Implementing `Send` and `Sync` manually is unsafe
+Bc if a type does not come with it means something, these types are not made up for this
 
 # Object oriented programming features of Rust (17)
 It is a design pattern in which objects pass messages to each other
@@ -1707,3 +1802,4 @@ impl State for PendingReview {
     }
 }
 ```
+
