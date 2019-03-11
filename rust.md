@@ -1805,7 +1805,7 @@ impl State for PendingReview {
 
 # PATTERNS AND MATCHING (18)
 Patterns are a syntax for matching against values. If the value does not fit the shape of the pattern, the code associated with the pattern will not run
-## Use cases
+## Use cases (18.1)
 ##### `match` arms
 ! must be exhaustive (all possible expressions must be accounted for. Catchall patterns like `_` help)
 ```
@@ -1827,20 +1827,46 @@ if let Some(color) = favorite_color {
 Shows the correct syntax but condition is not met.
 Note that `if let` creates a scope, so be careful to shadowing
 `if let` downside: exhaustiveness is not checked (ie `else` is not mandatory) which is a source of logical bugs
-
 ##### `while let` conditional loops
+```
+while let Some(top) = stack.pop() {
+    println!("{}", top);
+}
+```
+When `pop()` returns `None` the loop stops (pop is a `Vec` method that deletes last elem and returns `Some(new_last_elem)` or None` if empty).
 ##### `for` loops
-##### `let` statements
-##### function parameters
+```
+let v = vec!['a', 'b', 'c'];
 
-## Refutability: whether a pattern might fail to match
+for (index, value) in v.iter().enumerate() { // enumerate produces a tuple from an iterator
+    println!("{} is at index {}", value, index);
+}
+```
+##### `let` statements
+It is actually a pattern: `let PATTERN = EXPRESSION;`
+Destructuring (here a tuple) is possible: `let (x, y, z) = (1, 2, 3);`. Note that `let (x, y) = (1, 2, 3);` will not compile
+##### function parameters
+`fn foo(x: i32) {` is a pattern
+Destructuring is also possible:
+```
+fn print_coordinates(&(x, y): &(i32, i32)) {
+    println!("Current location: ({}, {})", x, y);
+}
+
+fn main() {
+    let point = (3, 5);
+    print_coordinates(&point);
+}
+```
+
+## Refutability: whether a pattern might fail to match (18.2)
 Patterns can either be:
 - Irrefutable: ie they match for *any* possible value. `let x = 5;` -> x can hold every value possible. Function params, `let` statements, `for` loops can only accept irrefutable patterns bc otherwise programs could not work safely
 - Refutable: ie some values are not handled. Ex: `if let Some(x) = val` if `val` equals `None` pattern will not match. `if let` and `while let` can only accept refutable patterns bc they are made to handle possible failure
 Consequence: `let Some(x) = some_option_value;` cannot compile and would error `refutable pattern in local binding: 'None' not covered`. `if let` is nice when  we have a refutable pattern where an irrefutable pattern is needed
 The other way other does not make sense and will not compile: `if let x = 5;` will error: `irrefutable if-let pattern`
 
-## All the pattern syntax
+## All the pattern syntax (18.3)
 ##### Matching literals
 `match x { 1 => println!("one"), }`
 ##### Matching named variables
@@ -1869,4 +1895,135 @@ match x {
 }
 ```
 ##### Destructuring to break apart values
-Patterns can be used to destructure structs, enums, tuples and references
+Patterns can be used to destructure structs, enums, tuples and references, even nested
+complex example: `let ((feet, inches), Point {x, y}) = ((3, 10), Point { x: 3, y: -10 });`
+###### Destructuring structs and enums
+```
+struct Point {
+    x: i32,
+    y: i32,
+}
+
+fn main() {
+    let p = Point { x: 0, y: 7 };
+    let Point { x, y } = p; // shorthand for let Point { x: a, y: b } = p; 
+}
+```
+Can be combined with `match`:
+```
+match p {
+    Point { x, y: 0 } => println!("On the x axis"), // matches for all x, when y: 0
+    Point { x, y } => println!("Coucou"), // matches everything
+}
+```
+###### Destructuring enums
+```
+enum Color { // tuple
+   Rgb(i32, i32, i32),
+   Hsv(i32, i32, i32)
+}
+enum Message {
+    Quit,
+    Move { x: i32, y: i32 }, // struct
+    ChangeColor(Color), // enum
+}
+
+fn main() {
+    let msg = Message::ChangeColor(Color::Hsv(0, 160, 255));
+
+    match msg {
+        Message::Quit => println!("Quit variant: no data to destructure."),
+        Message::Move { x, y } => println!("move struct destructured"),
+        Message::ChangeColor(Color::Hsv(h, s, v)) => println!("colors enum(tuple) destructured"),
+    }
+}
+```
+###### Destructuring references
+When the pattern's value contains a reference, specify a `&` in the pattern to get the pointed value rather than the variable that hosts the ref
+```
+let points = vec![
+    Point { x: 0, y: 0 },
+    Point { x: 1, y: 5 },
+    Point { x: 10, y: -3 },
+];
+
+let sum_of_squares: i32 = points
+    .iter()
+    .map(|&Point { x, y }| x * x + y * y)
+    .sum();
+```
+Without the `&` in `|&Point { x, y }|`: compile error, cannot access Point values directly
+
+##### Ignoring values in a pattern
+`_` replaces 1 value and `..` replaces every values left (but listed ones)
+Can be used in any pattern
+###### Ignoring an entire value with `_`
+- functions params: `fn foo(_: i32, y: i32) {` can be useful when implementing a trait if a param is not needed (clearer and removes the compiler warning)
+- `match`: 
+```
+match (setting_value, new_setting_value) {
+    (Some(_), Some(_), Some(_)) => () // useful to check to values are not `None`
+    (first, _, third) => (),
+}
+```
+###### Ignoring an unused variable by starting its name with `_`
+Useful when prototyping: `let _x = 5;` prevents from a compiler warning.
+Note that `_s` binds, `_` does not. Important:
+```
+let s = Some(String::from("Hello!"));
+if let Some(_s) = s {
+    println!("found a string");
+}
+println!("{:?}", s);
+```
+here the value has been moved into `_s` so compiler error when trying to print it. Would not have been moved using simply `_`
+###### Ignoring remaining parts of a value pair with `..`
+```
+match numbers {
+    (first, .., last) => {
+```
+However `(.., second, ..)` this pattern would result in an error as it is unclear.
+##### Extra conditionals with *match guards*
+Additional `if` in a `match` case, which is actually not a pattern
+```
+match num {
+    Some(x) if x < 5 => println!("less than five: {}", x),
+```
+Note: if `if` condition is not matched code will keep itering cases
+Note2: a shadowing workaround as you can use outer variables in match guards
+Match guard can be used with `|`:
+```
+let y = false;
+match x {
+    4 | 5 | 6 if y => println!("yes"),
+```
+that acts as `(4 | 5 | 6) if y` which means the `if` always applies to the result of the entire arm pattern
+###### `@` bindings
+Allows to create a variable that at the same time holds a value and tests it
+```
+enum Message {
+    Hello { id: i32 },
+}
+
+let msg = Message::Hello { id: 5 };
+
+match msg {
+    Message::Hello { id: id_variable @ 3...7 } => println!("Found an id in range: {}", id_variable),
+    // id value is both saved into id_variable AND checked on the 3..7 range
+    Message::Hello { id: 10...12 } => println!("Found an id in another range"), // cannot access id value here
+```
+
+##### Legacy patterns: `ref` and `ref mut`
+Mostly useless as of today bc Rust has been updated with abstraction but was useful when borrowing a variable, prevented the variable to be moved
+`ref` creates a reference, it is the opposite of `&` in patterns: it binds to a `&` so that Rust does not try to moove a variable.
+Old version working code:
+```
+let robot_name = &Some(String::from("Bors"));
+match robot_name {
+    &Some(ref name) => println!("Found a name: {}", name),
+    None => (),
+}
+```
+Today's changes a lot easier, in match first arm: `Some(name)`
+
+# ADVANCED FEATURES (19)
