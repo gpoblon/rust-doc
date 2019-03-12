@@ -2036,7 +2036,7 @@ Beware, it leaves the door open to problems due to memory unsafety, such as null
 Made possible bc Rust prefer to reject valid programs rather than accept invalid ones so it has to allow a workaround ; to allow low-level programming such as directly interacting with the operating system or even writing your own operating system
 Wrapping unsafe code in a safe abstraction prevents uses of `unsafe` from yourself or other users
 
-## Dereferencing a raw pointer (19.2)
+##### Dereferencing a raw pointer
 Raw pointers: `*const T` and `*mut T`. The `*` is not the dereference operator, it is part of the type name
 In the context of raw pointers, *immutable* means that the pointer can’t be directly assigned to after being dereferenced.
 Different from references and smart pointers, raw pointers:
@@ -2060,6 +2060,12 @@ unsafe {
 ```
 Creating a pointer does no harm, only accessing to its value can. In safe code it is not possible to read the data pointed at by a dereferenced raw pointer
 Major raw pointer use case: interfacing with C code or building up safe abstractions that the borrow checker doesn’t understand
+
+##### Calling an unsafe function or method
+
+
+
+
 
 # APPENDIX (21)
 ## Operators and symbols (21.2)
