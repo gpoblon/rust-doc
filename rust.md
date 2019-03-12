@@ -1883,7 +1883,6 @@ match x {
 println!("at the end: x = {:?}, y = {:?}", x, y); // will output x = Some(5), y = 10
 ```
 Solution: use *match guards* conditional (later section)
-
 ##### Multiple patterns and ranges of values
 `|` syntax means *or*.
 `...` allows to match an inclusive range of values. Only allowed for numeric values and `char` values.
@@ -2012,7 +2011,6 @@ match msg {
     // id value is both saved into id_variable AND checked on the 3..7 range
     Message::Hello { id: 10...12 } => println!("Found an id in another range"), // cannot access id value here
 ```
-
 ##### Legacy patterns: `ref` and `ref mut`
 Mostly useless as of today bc Rust has been updated with abstraction but was useful when borrowing a variable, prevented the variable to be moved
 `ref` creates a reference, it is the opposite of `&` in patterns: it binds to a `&` so that Rust does not try to moove a variable.
@@ -2027,3 +2025,112 @@ match robot_name {
 Today's changes a lot easier, in match first arm: `Some(name)`
 
 # ADVANCED FEATURES (19)
+## Unsafe Rust (19.1)
+Allow it with `unsafe` before a block
+The borrow checker etc still stands but enforces Rust to deal with memory at runtime. It gives 4 superpowers:
+- Deref a raw pointer
+- Call an unsafe fun / method
+- Access / modify a mut static variable
+- Implement an unsafe trait
+Beware, it leaves the door open to problems due to memory unsafety, such as null pointer dereferencing
+Made possible bc Rust prefer to reject valid programs rather than accept invalid ones so it has to allow a workaround ; to allow low-level programming such as directly interacting with the operating system or even writing your own operating system
+Wrapping unsafe code in a safe abstraction prevents uses of `unsafe` from yourself or other users
+
+## Dereferencing a raw pointer (19.2)
+Raw pointers: `*const T` and `*mut T`. The `*` is not the dereference operator, it is part of the type name
+In the context of raw pointers, *immutable* means that the pointer can’t be directly assigned to after being dereferenced.
+Different from references and smart pointers, raw pointers:
+- Are allowed to ignore the borrowing rules by having both immutable and mutable pointers or multiple mutable pointers to the same location (be careful to data races)
+- Are allowed to be null
+- Are not guaranteed to point to valid memory
+- Do not implement automatic cleaning
+Creating a raw pointer (safe code):
+```
+let mut num = 5;
+let address = 0x012345usize;
+
+let r1 = &num as *const i32; // created from a ref so guaranteed to be valid
+let r2 = &mut num as *mut i32; // created from a ref so guaranteed to be valid 
+let r3 = adress as *const i32; // created from an arbitrary memory location, unsecure
+
+unsafe {
+    println!("r1 is: {}", *r1);
+    println!("r2 is: {}", *r2);
+}
+```
+Creating a pointer does no harm, only accessing to its value can. In safe code it is not possible to read the data pointed at by a dereferenced raw pointer
+Major raw pointer use case: interfacing with C code or building up safe abstractions that the borrow checker doesn’t understand
+
+# APPENDIX (21)
+## Operators and symbols (21.2)
+##### Operators
+- `ident!` followed by `()/{}/[]` - macro expansion
+- `&expr, &mut expr` - Borrow
+- `&type, &mut type, &'a type, &'a mut type` - Borrowed pointer type
+- `!expr` - Bitwise or logical complement
+- `expr & expr` - Bitwise AND 
+- `var &= expr` - Bitwise AND and assignment
+- `expr ^ expr` - Bitwise exclusive OR
+- `expr | expr` - Bitwise OR
+- `expr << expr` - Left-shift
+- `expr >> expr` - Right-shift
+- `*expr` - Dereference
+- `*const type, *mut type` - Raw pointer 
+- `.., expr.., ..expr, expr..expr` - Right-exclusive range
+- `..=expr, expr..=expr` - Right-inclusive range
+- `ident @ pat` - Pattern binding
+- `pat | pat` - Pattern alternatives
+- `expr?` - Error propagation
+##### Symbols
+- `...u8, ...i32, ...f64, ...usize, etc.` - Numeric literal of specific type
+- `"..."` - String literal
+- `r"...", r#"..."#, r##"..."##, etc.` - Raw string literal, escape characters not processed
+- `b"..."` - Byte string literal; constructs a [u8] instead of a string
+- `br"...", br#"..."#, br##"..."##, etc.` - Raw byte string literal, combination of raw and byte string literal
+- `'...'` - Character literal
+- `b'...'` - ASCII byte literal
+- `|...|expr` - Closure
+- `!` - Always empty bottom type for diverging functions 
+
+## Derivable traits (21.3)
+the `derive` attrb appliable to a struct / enum definition implements traits. List of `derive` traits available: 
+##### `Debug` for programmer output
+- What it does: enable to print instances of a type for debug
+- Operators / methods made available: `:?` within `{}` operator
+- Trait required for: `assert_eq!` macro
+##### `PartialEq` and `Eq` for equality comparisons
+- What it does: compare instances of a type. `Eq` signals that for every value of a type the value is equal to itself.
+- Operators / methods made available: `==` `!=` operators, `eq()` method
+- Implementation requirments: `Eq` requires `PartialEq` trait and even then, some types cannot implement `Eq` (floating point types)
+- Trait required for: `Eq` required for keys in a `HashMap<K, V>`
+- Notes: `PartialEq` implements `Eq` ; `PartialEq` on structs: equal only if all fields are. On Enums: only equal to the compared variant
+##### `PartialOr` and `Ord` for ordering comparisons
+- What it does: compare instances of a type for sorting purposes. `Ord` allows to know that a valid ordering exists between 2 values
+- Operators / methods made available: `>` `<` `<=` `>=` operators, `partial_cmp()` method which returns an `Option<Ordering>` ; `cmp()` method which returns an `Ordering`
+- Implementation requirments: `Ord` requires both `PartialOrd` and `Eq`.
+- Trait required for: `gen_range` method from `rand` crate. When storing values in a `BTreeSet<T>` (`Ord`)
+- Notes: on structs, compares each field ; on enums, earlier variants are considered less.
+##### `Clone` and `Copy` for duplicating values
+- What it does: `Clone` to create a deep copy of heap data ; `Copy` to duplicate only the bits on the stack.
+- Operators / methods made available: `clone()` method that calls clone on each parts of the type, so each part must implement `Clone` 
+- Implementation requirments: `to_vec()` method on a slice
+- Trait required: `Clone` is required to implement `Copy`
+##### `Hash` for mapping a value to a value of fixed size
+- What it does: takes an instance of a type of arbitrary size and map the instance to a value of fixed 
+- Operators / methods made available: `hash()` method, called on each part of the `hash()` calling type so each part must implement it
+- Trait required for: storing keys in a `HashMap<K, V>` to store data efficiently
+##### `Default` for default values
+- What it does: creates a default value for a type
+- Operators / methods made available: `default()` fun, on each part so each part must implement the trait
+- Trait required for: `unwrap_or_default` method on `Option<T>` instances bc if `None` it will return the result of `Default::default()`
+
+## Useful development tools (21.4)
+- `$ cargo fmt` of the `rustfmt` tool: auto-formats to standard Rust style (beta, install it via `rustup component add rustfmt` which installs `cargo-fmt` too)
+- `cargo fix` of the `rustfix` tool: fixes your code by applying compiler correction suggestions
+- `cargo clippy` of the `clippy` linter (beta, install: `rustup component add clippy`): checks code to suggest corrections of common mistakes as `std::f64::consts::PI` instead of `3.1415`
+- IDE Integration (VS:Code) using the Rust Language Server: `rustup component add rls rust-analysis rust-src` to gain autocompletion, definition jumps, inline errors etc
+
+## Editions (21.5)
+Edition is found in the *Cargo.toml* file
+Rust language and compiler are updated every 6 weeks but new *editions* are pushed (in a 6-week update) every 2/3 years into a clear package, with fully updated documentation and tooling. Good and clean and fully updated rally point.
+`cargo fix --edition` upgrades code to a new edition
