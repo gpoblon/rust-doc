@@ -2024,6 +2024,7 @@ match robot_name {
 ```
 Today's changes a lot easier, in match first arm: `Some(name)`
 
+
 # ADVANCED FEATURES (19)
 ## Unsafe Rust (19.1)
 Allow it with `unsafe` before a block
@@ -2060,8 +2061,58 @@ unsafe {
 ```
 Creating a pointer does no harm, only accessing to its value can. In safe code it is not possible to read the data pointed at by a dereferenced raw pointer
 Major raw pointer use case: interfacing with C code or building up safe abstractions that the borrow checker doesn’t understand
-
 ##### Calling an unsafe function or method
+definition of a fun: `unsafe fn dangerous() { ... }` which must be called wrapped in an unsafe block
+To create a safe abstraction over unsafe code just wrap the unsafe part in a fun
+##### Using `extern` functions to call external code
+extern facilitates the creation and use of a *Foreign Function Interface (FFI)* to interact with other languages
+Extern implies the `unsafe` keyword
+```
+extern "C" {
+    fn abs(input: i32) -> i32;
+}
+
+fn main() {
+    unsafe {
+        println!("Absolute value of -3 according to C: {}", abs(-3));
+    }
+}
+```
+The `"C"` calls the language corresponding *application binary interface (ABI)* (assembly)
+Work the other way too, the following function is accessible in C code:
+```
+#[no_mangle]
+pub extern "C" fn call_from_c() {
+    println!("Just called a Rust function from C!");
+}
+```
+##### Access or modify a mutable static variable
+*global variables* exist in Rust as *static* variables but can cause data races when mutable
+```
+static HELLO_WORLD: &str = "Hello, world!"; // type is &'static str
+
+fn main() {
+    println!("name is: {}", HELLO_WORLD);
+}
+```
+Variable's type must be annotated. All static references have the `'static` lifetime so it can be implicit
+Static variables have a fixed adress in memory and are mutable (!= constants).
+Any code that reads or write from a static variable must be in an `unsafe` block bc it is difficult to ensure there is no data race in a globally accessible variable
+Avoid mutable static variables whenever possible
+##### Implementing an unsafe trait
+A trait is `unsafe` when any of its methods has some invariant Rust compiler cannot verify. 
+```
+unsafe trait Foo { // Declaration
+    // methods go here
+}
+
+unsafe impl Foo for i32 {
+    // method implementations go here
+}
+```
+
+##### When to use unsage code
+
 
 
 
