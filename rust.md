@@ -2111,9 +2111,38 @@ unsafe impl Foo for i32 {
 }
 ```
 
-##### When to use unsage code
+## Advanced Lifetimes (19.2)
+## Advanced traits (19.3)
+## Advanced types (19.4)
+## Advanced functions & closures (19.5)
 
-
+## Macros (19.6)
+Macros refer to a family of features:
+- *Declarative* macros with `macro_rules!`
+- *Procedural* macros with: custom `#[derive]` macros ; attribute-like macros ; function-like macros
+##### The difference between macros and functions
+Macros are *metaprogramming* = write code that writes other code
+Downside: macro definitions are more complex, less readable and maintainable than fun as we write Rust code that writes code
+Macros can take a variable number of params
+Fun are called at runtime but macros are expanded before. So for example traits can be implemented in macros, not functions
+Macros must be defined/brought into scope before being called. Fun can be defined and called anywhere
+##### Declarative macros with `macro_rules!` for general metaprogramming AKA *macros by example*
+Most common. Similar to pattern matching: at compilation type, macros compare a value (associated to code) to patterns (structures of that source code) then run the code associated with the pattern
+`let v: Vec<u32> = vec![1, 2, 3];` 
+Simplified definition of the macro `vec!`:
+```
+#[macro_export] // allows to bring the macro into scope
+macro_rules! vec { // macro_rules! name_of_the_macro
+    ($($x:expr), *) => { // pattern
+        let myt temp_vec = Vec::new();
+        $(
+            temp_vec.push($x);
+        )*
+        temp_vec
+    }
+}
+```
+Here there is a one-armed pattern (`($($x:expr), *)`). if it matches: associated code is emitted, if not: error
 
 
 
