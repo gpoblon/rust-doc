@@ -645,17 +645,15 @@ Pre-checks:
     - implement public setters/getters and keep variables private, so that only the setter does a check when editing a value (getter example: `pub fn value(&self) -> i32 { self.value }`)
 
 
-# Generic types, traits, and lifetimes (10)
-
+# GENERIC TYPES, TRAITS AND LIFETIMES (10)
 ## Generic data types (10.1)
 A given generic type name can represent any given type but once it has been given, it keeps this same type.
 ##### In functions
-`fn largest<T>(list: &[T]) -> T {`: `<T>` before params in the signature is mandatory so the compiler know what `T` means.
+`fn largest<T>(list: &[T]) -> T {`: `<T>` before params in the signature is mandatory so the compiler knows what `T` means.
 Note: `T` (short for *type*) is the common identifier name. The input and output must have the same type but it can be any type.
 ##### In structs
 `struct Point<T> { x: T, y: T, }`. Note that code will not compile if all type `T` fields are not of the same type.
 But there can be different *generics*: `struct Point<T, U> { x: T, y: U, }`.
-Too many different *generics* might be a sign of wrong design.
 ##### In enums
 `enum Option<K, E> { Ok(K), Err(E), };`. Same thing.
 ##### In method definitions
@@ -702,7 +700,8 @@ pub trait Summary {
     fn summarize(&self) -> String; // note the semicolon != brackets
 }
 ```
-Any type that has the `Summary` trait must have the `summarize` method with the same signature. Needs to be `pub` so that another crate can implement it
+Now, any type that has the `Summary` trait must have the `summarize` method with the same signature
+Needs to be `pub` so that another crate can implement it
 It is implemented as:
 ```
 pub struct NewsArticle {
@@ -718,13 +717,12 @@ impl Summary for NewsArticle {
     }
 }
 ```
-implementing a trait is similar to implementing methods with `for` added.
+implementing a trait looks similar to implementing methods with `for` added.
 It is possible to make a trait local to a scope.
-! *coherence* restriction: a trait can be implemented on a type only if either the trait or the type is local to our crate.
-If the trait is not local, it needs to be brought into scope as: `use externalcrate::Summary;`
+! *coherence* restriction: if neither trait or type are locally defined, the trait needs to be brought into scope as: `use externalcrate::Summary;`
 
 ##### Default implementations
-It is overwritten by specific methods for a given trait but is still useful. Defined directly in the trait definition (vs semicolon)
+Are overwritten by specific methods for a given trait but are useful. Defined directly in the trait definition (vs semicolon)
 ```
 pub trait Summary {
     fn summarize(&self) -> String {
@@ -732,14 +730,14 @@ pub trait Summary {
     }
 }
 ```
-Here if not overwritten, a default string will be create.
+Here if not overwritten, a default string will be created.
 To use the default implementation in an instance, call it empty: `impl Summary for NewsArticle {}`.
 
 ##### Traits as arguments
+Only works with types that actually implements the required trait
 `pub fn notify(item: impl Summary) {` gives access to `item.summarize()` in the fun body.
-This form is a sugar for `pub fn notify<T: Summary>(item: T) {` which can be useful to force to have the same types when having 2+ params: `pub fn notify<T: Summary>(item1: T, item2: T) {`.
-Several traits can be `impl`: `pub fn notify(item: impl Summary + Display) {` or `pub fn notify<T: Summary + Display>(item: T) {`.
-`where` clauses for clearer code: previous function could be written as:
+This form is a sugar for `pub fn notify<T: Summary>(item: T) {`, the last can be useful when 2+ params have the trait type: `pub fn notify<T: Summary>(item1: T, item2: T) {`.
+Several traits can be `impl`: `pub fn notify(item: impl Summary + Display) {` or `pub fn notify<T: Summary + Display>(item: T) {` or even using `where`:
 ```
 pub fn notify<T>(item: T) -> i32
     where T: : Summary + Display
@@ -956,7 +954,7 @@ fn it_adds_two() {
 Rust projects that provide a binary have a straightforward src/main.rs file that calls logic that lives in the src/lib.rs file.
 Doing so allows to have *integration test*. It is not possible to `use` elements of a *src/main.rs* file: binary crates are meant to run on their own
 
-# Functional language features: Iterators and Closures (13)
+# FUNCTIONAL LANGUAGE FEATURES: ITERATORS AND CLOSURES (13)
 
 ## Closures: anonymous functions (13.1)
 *Closures* are particular anonymous functions that are storable in a variable or passable as function arguments
@@ -2113,6 +2111,85 @@ unsafe impl Foo for i32 {
 
 ## Advanced Lifetimes (19.2)
 ## Advanced traits (19.3)
+##### Associated types
+For example `Iterator` has an associated type named `Item` which is the type of the iterated values
+```
+pub trait Iterator {
+    type Item;
+    fn next(&mut self) -> Option<Self::Item>;
+}
+```
+Implementers of the `Iterator` trait will specify the concrete `Item` type:
+```
+impl Iterator for Counter {
+    type Item = u32;
+
+    fn next(&mut self) -> Option<Self::Item> {
+```
+###### Associated types versus generics
+Hypothetical `Iterator` implementation using generics:
+```
+pub trait Iterator<T> {
+    fn next(&mut self) -> Option<T>;
+}
+```
+Difference is generics would allow for multiple impl of `Iterator` for `Counter` (one for each type). Downside is for every `next()` call, type annotation is mandatory. With associated types, `Counter` is locked to only 1 concrete type implementation but `next()` knows its type. Other advantage, clarity:
+```
+trait GGraph<Node, Edge> { // definition of a trait using generics
+    fn distance<N, E, G: GGraph<N, E>>(graph: &G, start: &N, end: &N) -> u32;
+}
+
+trait AGraph {  // definition of a trait using associated types
+    type Node;
+    type Edge;
+    
+    fn distance<G: AGraph>(graph: &G, start: &G::Node, end: &G::Node) -> u32;
+}
+```
+###### Trait objects with associated types
+Last advantage: the type can be defined in the trait objects when the associated types are used in a single argument (`fn traverse(graph: &AGraph<Node=usize, Edge=(usize, usize)>) {}`). (not sure about my understanding of this one)
+##### Operator overloading and default type parameters
+`<placeholderType=ContreteType>` is useful to specify the default type that can be overwritten (just by specifying another type in the implementation) for a generic type. Rust does not allow to create our own operators or to overload operators but the operation and corresponding traits listed in `std::ops` can be overloaded. Ex with operator overloading:
+```
+use std::ops::Add;
+
+#[derive(Debug,PartialEq)]
+struct Millimeters(u32);
+#[derive(Debug,PartialEq)]
+struct Meters(u32);
+
+impl Add for Millimeters {
+    type Output = Millimeters;
+
+    fn add(self, other: Millimeters) -> Millimeters {
+        Millimeters(self.0 + other.0)
+    }
+}
+
+impl Add<Meters> for Millimeters {
+    type Output = Millimeters;
+
+    fn add(self, other: Meters) -> Millimeters {
+        Millimeters(self.0 + (other.0 * 1000))
+    }
+}
+
+fn main() {
+    assert_eq!(Millimeters(1) + Millimeters(4), Millimeters(5));
+}
+```
+`Add` definition uses a default type:
+```
+trait Add<RHS=Self> {
+    type Output;
+    fn add(self, rhs: RHS) -> Self::Output;
+}
+```
+So if `RHS` is not defined it will have its default concrete type (the same as `Self` = the type `Add` is implemented on)
+##### Fully qualified syntax for disambiguation
+Several traits can share the same method's name. If they are implemented on one type (which can directly have a method with this same name), by default the direct type method will be called. To prevent this, rather than doing the standard `receiver.method(args);` do: `<Type as Trait>::method(receiver, args);` or shortened `Trait::method(receiver)`
+##### Supertraits to use one trait's functionality within another trait
+
 ## Advanced types (19.4)
 *newtypes*, *aliases*, `!` type, dynamically sized types
 ##### Newtype encapsulation pattern for type safety and abstraction
@@ -2122,8 +2199,25 @@ unsafe impl Foo for i32 {
 `type Kilometers = i32;` they become synonym, ie they are interchangable (vs newtypes)
 Main use case is to reduce repetition: `type Thunk = Box<dyn Fn() + Send + 'static>;` (to store a closure) -> `let f: Thunk = Box::new(|| println!("hi"));`
 `type Result<T> = Result<T, std::io::Error>;` (!= `Result<T, E>`) is a Result shortcut that can be called afterwards as: `Result<usize>` rathan than `Result<usize, std::io::Error>`
-
-
+##### Never type that never returns
+`!` is the *empty type*, use cases:
+- For a (*diverging*) function that never returns: `fn bar() -> ! {`
+- For `match` patterns as all arms must return the same type but `!` works:
+    ```
+    let guess: u32 = match guess.trim().parse() {
+        Ok(num) => num,
+        Err(_) => continue, // continue has a `!` value, `!` coerces in any other type
+    };
+    ```
+    When matching `continue`, no value is returned, the control is given back to the top of the loop
+    Works with `panic!` too as it has a `!` type and ends the program (does not return a value)
+- For loops: if a loop never ends (!= `break`), it has a `!` value
+##### Dynamically sized types and the `sized` trait
+Ex: `str` is a *DST*. `let s1: str = "DO NOT COMPILE";` bc its size is unknown, this is why a slice string `&str` (that stores both the position and len). Particular case as a `&T` usually only stores the adress of the `T`.
+This is how Rust usually deals with *DST*: storing the variable adress and a `usize` of the elem size
+Traits are DST: to use traits as objects, you must use a pointer: `&dyn Trait` or `Box<dyn Trait>` or `Rc<dyn Trait>`
+`Sized` is a trait the is automatically implemented for everything whose size is known at compile time and for generic functions:
+`fn generic<T>(t: T) {}` equals `fn generic<T: Sized>(t: T) {}` work only on compile time known sized elements unless `fn generic<T: ?Sized>(t: T) {}` is used (`&T` as the size may not be known)
 
 ## Advanced functions & closures (19.5)
 ##### Function pointers
