@@ -1,0 +1,1 @@
+/mnt/c/Users/gaeta/OneDrive/Documents/linux/rust/tests/target/debug/libft_lib.rlib: /mnt/c/Users/gaeta/OneDrive/Documents/linux/rust/tests/src/lib.rs /mnt/c/Users/gaeta/OneDrive/Documents/linux/rust/tests/src/sound/instrument.rs /mnt/c/Users/gaeta/OneDrive/Documents/linux/rust/tests/src/sound.rs

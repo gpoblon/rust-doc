@@ -4,4 +4,12 @@ version = "0.1.0"
 authors = ["gpoblon"]
 edition = "2018"
 
+[lib]
+name = "ft_lib"
+path = "src/lib.rs"
+
+[[bin]]
+name = "tests"
+path = "src/main.rs"
+
 [dependencies]

@@ -1,3 +1,4 @@
+/*
 use std::ops::Add;
 
 #[derive(Debug,PartialEq)]
@@ -22,5 +23,22 @@ impl Add<Meters> for Millimeters {
 }
 
 fn main() {
+    let my_string = String::from("hello world");
+    let word = &my_string[..];
+
+    println!("string: {}", word);
     assert_eq!(Millimeters(1) + Millimeters(4), Millimeters(5));
+}
+*/
+
+use ft_lib::sound;
+
+fn main() {
+    println!("sound imported");
+    ft_lib::test();
+    sound::pv_mod_fn();
+    // sound::instrument::clarinet(); // will compile as `clarinet()` and its parent are public
+    // sound::instrument::pv_drum(); // will not compile as `pv_drum()` is not public
+    // sound::pv_mod::pub_err(); // will not compile as `pv_mod` is not public
+
 }

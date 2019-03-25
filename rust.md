@@ -1,8 +1,9 @@
-# RUST
+# RUST 2015 (+ 2018 update)
 
 # Side Notes
 - Statements vs expressions: statements perform an action but do not return a value. Expr evaluate to a resulting value. But expressions can be part of statements (ex: `6` expr from `let = 6;` statement).
-- Generic type works best for homogeneous collections whether trait bounds works best with multiple possible types.
+- Generic type work best for homogeneous collections but trait bounds work best with multiple possible types.
+- Convert decimals to binaries: count right to left, from 2^0 to 2^X... add 2^X when a 1 is found. Nice ref to converters (https://www.culture-informatique.net/conversion-binaire-decimal-hexadecimal-main/)
 
 # Code Conventions
 - variables are snake case (lowercase + underscore)
@@ -12,37 +13,77 @@
 - use the `use` keyword to bring parent module of an elem (fun, struct, enum...) into scope, not directly the element
 - exception: if two types have the same name, use `use` on its parent or rename it with `use std::io::Result as IoResult;`
 
-# INSTALLATION (1.1)
-
+# INSTALLATION AND CARGO COMMANDS (1.1)
 On macOS: `curl https://sh.rustup.rs -sSf | sh`
 On Windows: `https://www.rust-lang.org/install.html`
-Main commands:
+## Main commands:
 `rustup update`
-`rustc --version`; `rustc x.y.z` to hotswap versions.
+`rustc --version`; `rustc x.y.z` to hotswap versions
 `rustup doc` offline doc
 `rustc main.rs && ./main` to compile then execute by hand (`./main.exe` on Windows).
-Cargo (automatically installed with rustup):
+## Cargo (automatically installed with rustup):
 `cargo --version`
-`cargo new pjname` creates a project with a Cargo.toml file + basic main.
-`cargo build` compiles and creates an exe in `./target/debug/pjname` + creates a Cargo.lock the first time to keep a track of dependencies versions used.
+`cargo rustc`(... `-- -Z print-type-sizes`) to pass arbitrary `rustc` flags (local to a given crate)  
+`cargo new pjname` creates a binary (vs library) project with a Cargo.toml file + basic main. use `--lib` to create a lib or `--bin` to explicitly create an executable crate
+`cargo build` compiles and creates an exe in `./target/debug/pjname` + creates a Cargo.lock the first time to keep a track of dependencies versions used
 `cargo build --release` compiles with optimizations and creates exe in `./target/release/pjname`
-`cargo check` checks code but does not actually creates the exe. Faster.
-`cargo run` compiles + runs it (== `cargo build && ./target/debug/pjname`).
+`cargo check` checks code but does not actually creates the exe. Faster
+`cargo run` compiles + runs it (== `cargo build && ./target/debug/pjname`)
+`cargo install` for easy installation of tools (ex: `cargo_update` or `mdbook`)
 NB: 2 kinds of errors when compiling. Compilation errors and runtime errors are checked by the `cargo run` command.
+## Rust features (2018)
+###### Projects
+Rust projects can either be: a package (set of one+ crates), or since Rust 2018 a workspace (set of packages).
+To create one, add `[workspace]` (*Cargo.toml*). With workspaces, packages can be developped individually but they share the same dependencies
+```
+[workspace]
+members = ["path/to/member1", "path/to/member2", "path/to/member3/*"]
+exclude = ["path1", "path/to/dir2"] // optional line
+```
+###### Examples
+Examples show people how to use a crate. Can either be a single-file of multiple files
+```
+my-package
+ └──src
+     └── lib.rs // code here
+ └──examples 
+     └── simple-example.rs // a single-file example
+     └── complex-example
+        └── helper.rs
+        └── main.rs // a more complex example that also uses `helper` as a submodule
+```
+###### `[patch]` to replace dependencies
+If a dependencie has a bug, we can use a (eventually corrected) local version of the dependency with patch in the *cargo.toml* file:
+```
+[dependencies]
+foo = "1.2.3"
+
+[patch.crates-io]
+bar = { path = '/path/to/bar' }
+```
+###### Use another registry than crates.io
+```
+[source.crates-io]
+replace-with = 'my-awesome-registry'
+
+[source.my-awesome-registry]
+registry = 'https://github.com/my-awesome/registry-index'
+```
+###### Wildcard dependencies death
+Dependencies must now refer to a range: `regex = "1.0.0"` using `> >= < ^ ~`
 
 # MAIN CONCEPTS (3)
-
 - Keywords:
     Keywords names are reserved unless a "raw identifier" is used: `r#keyword`
 - Variables
     `let`. By default immutable unless `mut` is used. Limited to their scope.
-    Different than `const MAX_POINTS: u32 = 100_000;` which are global and can only be set to constant expr (!= fun call / runtime computed variables).
+    Different than `const MAX_POINTS: u32 = 100_000;` that are global and can only be set to constant expr (!= fun call / runtime computed variables).
     Shadowing (`let x = 5; let x = x + 5;`) is another way to reassign. Differences: redeclared every change + copy (vs ref) + type can change.
 
 ## Data types (3.2)
 Scalar types:
 - integers:
-    i8 / 16 / 32 / 64 / 128 / isize or u8...
+    i8 / 16 / 32 / 64 / 128 / isize or u8.../ usize
     Size is the archi depending size ex: 64bit achi = i64.
     Int literals: decimal - hexa (`0x`) - octa (`0o`) - binary(`0b`) - byte (u8 only)
     `_` is a separator.
@@ -61,7 +102,7 @@ Compound types:
     Can be destructured: `let (x, y, z) = tup;`.
     Access to elements : `tup.1`
 - Arrays:
-    type must be the same and fixed length.
+    A single type by array and fixed length
     Arrays are on the stack.
     `let arr: [i32; 5] = [1, 2, 3, 4, 5];`
     Access to elements: `arr[0]`.
@@ -83,7 +124,7 @@ fn get_new_xy(x: i32, y: i32) -> i32 {
 Rust does not care where functions are defined.
 
 ## Control Flow (3.5)
-- `if cond {}` Expr: condition must be a bool. CExemple of possibility:
+- `if cond {}` Expr: condition must be a bool. Example:
 ```
 let number = if condition {
         5
@@ -92,28 +133,25 @@ let number = if condition {
     };
 ```
 - `loop {}` = forever until `break`
-- `while cond {}`
 - `for number in (1..4) {}` = safest = more commonly used
+- `while cond {}`
+
 
 # OWNERSHIP (4)
-
 ## Definition (4.1)
 Central and unique Rust feature, ownership exists to manage heap data. No need for garbage collector.
 Rules:
 - Each value in Rust has a variable that’s called its owner.
 - There can only be one owner at a time.
-- When the owner goes out of scope, the value will be dropped.
-- Value and variable are distinct as the variable can be rewritten after its value as been freed.
-
-Ex through String.
+- When the owner goes out of scope, the value is dropped.
+- Value and variable are distinct as the variable can be rewritten after its value was freed.
+Ex:
 `let s = "hello";` is a string literal (hardcoded) vs `let mut s1 = String::from("hello");` that can be edited and is located on the heap.
 String is composed of 3 variables in the stack: a ptr to the heap ; a len ; a capacity (nbr of allocated bytes from the system).
--  Move copy: `let s2 = s1;` s1 is moved into s2 AND `s1` value is freed and becomes invalid. `s1` is still available as a variable and can therefore be rewritten. s2 is a copy of the stack but still, is a reference.
-- Deep clone: `let s2 = s1.clone();` copies the whole data, creating a new pointer.
-
-Some types have the `Copy` trait such as: integer, bool, float, char. Tuple too if they contain only `Copy` types. Means that after `let x = 5; let y = x;`, `x` is still valid.
-
-Ownership can be transmitted: by returning the variable or passing it to a function as an argument. So be careful when passing a heap variable to a function: return it. So tedious. Solution is to use references
+- Move copy: `let s2 = s1;` `s1` variable (pointer, len, capacity) is MOVED into `s2` and `s1` variable becomes invalid (but can be reassigned). s2 is a copy of the stack but still, is a reference to the same heap data.
+- Deep clone: `let s2 = s1.clone();` copies the whole data (heap), creating a new pointer.
+Some types have the `Copy` trait such as: integer, bool, float, char. Tuples too if they contain only `Copy` types. Means that after `let x = 5; let y = x;`, `x` is still valid.
+Ownership is transmitted by returning the variable or passing it to a function as an argument. So be careful when passing a heap variable to a function: return it (tedious) or use references
 
 ## References (borrowing) (4.2)
 Allows to pass values without passing ownership.
@@ -125,24 +163,20 @@ fn get_len(s: &String) -> usize {
 }
 ```
 `s` contains only the ptr to s1.
-
 ##### Mutable references
 A borrowed value cannot be modified unless `mut` is used: `...fn get_len(s: &String) -> usize {...`. Ofc the initial `String` has to be `mut` too.
-Restriction: `let r1 = &mut s; let r2 = &mut s;` only one mut ref of a data at a given scope. Trick is to create a new scope (`{ let r1 = &mut s; }`)
-Useful because if the ownership is passed the variable dies in the new scope and becomes impossible to use in the previous one.
+Care, `let r1 = &mut s; let r2 = &mut s;` is forbidden: only one mut ref of a data at a given scope.
 Can have multiple immutable ref but not a mut while having an immutable one. Security measure, ex:
 ```
 let first = &v[0]; // immutable borrow
 v.push(6); // mutable borrow
 ```
 will not compile because if the new element pushed implies a reallocation, the reference to the first would then point to a deallocated zone = crash.
-
-
-## Dangling references
-Cannot create a variable in a scope and return a reference to this variable. You must return the variable directly.
+##### Dangling references
+Cannot create a variable in a scope and return a reference to this variable since it will be dropped. You must return the variable directly
 
 ## Slices (4.3)
-It is possible to keep a reference of a portion of a String: (all following statements are equal): 
+It is possible to have a reference of only a portion of a String: (all following statements are equal): 
 ```
 let s = String::from("hello");
 let len = s.len();
@@ -152,11 +186,13 @@ let hello = &s[0..=4];
 let hello = &s[..];
 let hello = &s[..len];
 ```
-A String can be passed as a literal: `&s[..]` which has a `&str` type rather than `&String` type. Doing this also works with literal so it is more generic.
-Of course slice works with every type of collections, not just `String`.
+A String can be passed as a literal: `&s[..]` which has a `&str` type rather than `&String` type
+Ofc slice works with every type of collections, not just `String`s
 
 
 # STRUCTURES (5)
+###### Rust 2018 side note
+Rust can now force struct alignment in memory by adding before a struct declaration: `#[repr(align(16))]`
 
 ## 5.1 Defining and instanciating structs
 Like tuples but each variable is named. 
@@ -166,7 +202,7 @@ Struct User { // definition
     email: String
 }
 
-let mut user1 = User { // initialisation, not necessarily mutable
+let mut user1 = User { // initialisation. Not necessarily mutable
     email: String::from("test@gmail.com"),
     username: String::from("test")
 };
@@ -177,20 +213,16 @@ fn build_user(email: String, username: String) -> User {
     User { email, username } // shorthand if param and field name are the same
 }
 ```
-Note that either the entire struct is mutable or it is not at all, fields cannot.
-
+Note that either the entire struct is mutable or it is not at all, fields cannot
 ##### Creating instances from other instances with stuct update syntax
 `let user2 = User { ..user1 };`
-
 ##### Tuple structs
-structs without named fields: `struct Color(i32, i32, i32); let black = Color(0, 0, 0);` vs tuple `let color = (0, 0, 0);`
-The only difference with tuples is that the struct is named and cannot be swapped with an equivalent typed struct as a function param for exemple.
-
+Structs without named fields: `struct Color(i32, i32, i32); let black = Color(0, 0, 0);` vs tuple `let color = (0, 0, 0);`
+Difference with tuples: struct is named and cannot be swapped with an equivalent typed struct as a function param for example.
 ##### Unit-like structs
-Empty `()` structs. Useful when... see later.
-
+Empty `()` structs. Useful to implement traits on a type within no data needs to be stored
 ##### Ownership of struct data
-Structs can have references owned by something else using the lifetimes feature.
+It is easier to make sure a struct owns its data (fe by using `String` rather than string literals) but structs can store references owned by something else, by using lifetime specifiers.
 
 ## Debug a struct (5.2)
 ```
@@ -218,18 +250,18 @@ impl Rectangle {
 }
 ```
 and is called by: `rect1.area();`.
-`self` is only borrowed because it just reads, does not write (`&mut self`) / does not need ownership (rare).
-Rust has a feature called 'automatic de/referencing', adding `& mut *` to match the object signature so `->` is not needed to access an method.
-
+`self` is only borrowed here bc it just reads, does not write (`&mut self`) / does not need ownership (which is possible).
+Rust has a feature called 'automatic de/referencing', adding `& mut *` to match the object signature so `->` is not needed to access an method from a pointer like it would be in C(++...).
 ##### Associated functions
 functions != methods: are part of the struct BUT they do not have a `self` param. Often use to create a new instance of the struct.
-It is called by `rect1::my_fun();`.
+It is called by `rect1::my_fun();`
 
-##### Multiple `impl` Blocks
-Sometimes useful.
 
 # ENUMS AND PATTERN MATCHING (6)
-## Definition of Enums (6.1)
+###### Rust 2018 side note
+`union` is a new keyword that works as `enum` but untagged at runtime. Care as they are by definition `unsafe` to use. Limited usage, but they interpolate with C unions. More memory efficients
+
+## `enum` definition (6.1)
 ```
 enum Message {
     Quit,
@@ -238,11 +270,10 @@ enum Message {
     ChangeColor(i32, i32, i32),
 }
 ```
-accessed by: `let changeColor = Message::ChangeColor(0, 255, 0);`.
-Can be used as struct field or a param: `fn route(message: Message) { }` then called `route(Message::Quit);`.
-An enum can contain data (including methods, structs, enums).
-Methods are declared as they are in structs, using `impl` and are called on any elem of the enum: `Message::Write(String::from("hello")).call();`
-
+Accessed by: `let changeColor = Message::ChangeColor(0, 255, 0);`.
+Can be used as struct fields or params: `fn route(message: Message) { }`, called `route(Message::Quit);`.
+Enums and enum fields can contain data (including methods, structs, other enums)
+Methods are declared as they are in structs, using `impl` and can be called on any elem of the enum: `Message::Write(String::from("hello")).call();`
 ##### Option type (enum)
 Replaces the `null` value that cause too many errors.
 ```
@@ -287,15 +318,15 @@ fn value_in_cents(coin: Coin) -> u32 {
 ```
 fn plus_one(x: Option<i32>) -> Option<i32> {
     match x {
-        None => None,
         Some(i) => Some(i + 1),
+        None => None,
     }
 }
 ```
 ##### Match is exhaustive
-...so all cases must be handled (if not: compilation error).
+...so all cases must be handled (if not: compilation error)
 ##### The placeholder `_`
-matches any value
+It matches any value
 ```
     match u8_value {
         1 => 1
@@ -309,36 +340,40 @@ matches any value
 ```
 if let Some(3) = some_u8_val {
     println!("three");
-} else {
-    println!("None");
 }
 
-// is the same thing that
+// same thing that
 match some_u8_val {
     Some(3) => println!("three"),
-    _ => println!("None"),
+    _ => (),
 }
 ```
-Can have a `else` expr.
+Can have a `else` expr but main usage is to match only 1 case. Kind of sugar for `match`
+
 
 # PACKAGES, CRATES AND MODULES (7)
 Rust features related to scope.
-- A package is a Cargo feature that let you build, test, and share crates. (like nodejs packages)
-- A crate is a tree of modules that produce a binry / library or executable.
+- A path is the name of an item such as a struct, function, or module.
 - A module and the `use` keyword let you control the scope and privacy of paths.
-- A path is a way of naming an item such as a struct, function, or module.
+- A crate is a tree of modules that produce a binary / library or executable.
+- A package is a Cargo feature that let you build, test, and share united sets of crates. (like nodejs packages)
+- A workspace is a set of packages that share the same *cargo.lock* (big projects)
+
+- `mod` declares a new module. A module is a namespace that contains definitions of functions, types, structs, enums... Module's code can follow its declaration or in another file
+- by default, functions, types, constants, and modules are private unless prefixed with `pub` that makes it visible outside its namespace.
+- `use` brings modules or module's definitions into scope
 
 ## Packages and crates for making libraries and executables (7.1)
 Crate = binary / library.
-A crate has a root, a source file that defines how to build the crate.
-A package has a Cargo.toml file that describes how to build one+ crates.
-`cargo new` creates a package (bc it has a Cargo.toml file).
-Convention: Rust knows when there is a binary crate located at *src/main.rs* or a library crate located at *src/lib.rs*
-A package can have 0 / 1 binary crate but +inf libs. But if it has a lib and a binary it has 2 crates with the same names.
-Multiple binaries is possible by placing files in *src/bin/*, each file will be a separate binary crate.
+A crate has a root, a source file that defines how to build the crate
+A package has a Cargo.toml file that describes how to build one+ crates
+`cargo new` creates a package (bc it has a Cargo.toml file)
+`cargo new communicator` will create a library crate with only (*src/lib.rs*). Library crates can be used as dependencies. `cargo run` will not work, use `cargo build`
+Add `--bin` to create a binary crate instead (*src/main.rs*). Multiple binaries is made possible by placing files in *src/bin/*, each file will be a separate binary crate
+A package can have 0 / 1 binary crate but +inf libs. But if it has both (a lib and a binary) it has 2 crates with the same names
 
-## The module system to control scope and privacy (7.2)
-create a module with crate roots:
+## The module system to control scope; and the filesystem (7.2)
+create a (nested) module with crate roots:
 ```
 mod sound {
     mod instrument {
@@ -347,42 +382,76 @@ mod sound {
     mod voice {}
 }
 ```
-#### Paths
+access it via: `sound::instrument::guitar();` (would need the `pub` keyword here and there)
+##### Paths
 - absolute: `crate::sound::voice`
 - relative: `sound::voice` and uses `self` `super` or an identifier in the current module.
-#### Modules as the Privacy Boundary
-`pub mod` makes current `mod` public but its components stay private.
-ALL children `mod` elements are private by default. But current and ancestor `mod` are public for the current module.
+##### Separating modules into different files
+*Updated Rust 2018*, `mod.rs` file no longer needed. File rules (that work recursively):
+Rust 2015:
 ```
-mod sound {
-    pub mod instrument {
-        pub fn clarinet() {}
-    ...
+├── sound
+│   ├── instrument.rs (contains `sound::instrument` definition without `mod instrument {` wrapper, already defined in `mod.rs`)
+│   └── mod.rs (contains `sound` definition and `instrument` declaration (`mod instrument;`))
 ```
-if `clarinet()` was not pub it would not be accessible from the root of the crate.
+Rust 2018:
+```
+├── sound
+│   ├── instrument.rs (contains `sound::instrument` definition without `mod instrument {` wrapper, already defined in `mod.rs`)
+└── sound.rs (contains `sound` definition and `instrument` declaration (`mod instrument;`))
+```
+##### `extern crate` to import crates / libraries / modules (obsolete)
+*Rust 2018 update*: no longer needer, only mention the crate in the *Cargo.toml* `[dependencies]` list, no need to import it in the actual code (excepted for the `sysroot` crate)
+In *src/main.rs*, bring the `sound` module/library into scope with `extern crate sound;`. Note that the `extern crate` should always be in our root module (*src/main.rs* or *src/lib.rs*) even if called from a submodule... then refer to them as if the crates were top-level modules
 
-##### Starting Relative Paths with `super`
-`super` is equivalent to: `../` to the path: calling `super::foo()` calls the parents' module `foo` function. Ex:
+## Controlling visibility with `pub` (7.2#new_version)
+Without `pub` library modules will compile with `never used` functions warnings as they cannot be used outside of the lib
+Add `pub` before a function / module definition to make it accessible outside a crate
+Even if `pub`, module components stay private: all `mod` children (functions) are private by default
+The library itself can from the inside call its own private current (current scope) and ancestor components:
+*src/sound/mod.rs* file:
 ```
-mod sound {
-    mod instrument {
-        fn clarinet() {
-            super::breathe_in(); // context is now sound
-        }
-    }
+pub mod instrument {
+    pub fn clarinet() {}
+    fn pv_drum() {}
+}
 
-    fn breathe_in() {} // child of sound module
+mod pv_mod {
+    pub fn pub_err() {}
+}
+
+fn test() {
+    sound::instrument::clarinet(); // will compile as `clarinet()` and its parent are public
+    sound::instrument::pv_drum(); // will not compile as `pv_drum()` is not public
+    sound::pv_mod::pub_err(); // will not compile as `pv_mod` is not public
 }
 ```
+`sound` module is private but appears public to the calling function `test()` as it is on the same level.
+Any of its public children are therefore recursively accessible to `test()`, so `clarinet()` can be called.
+However `pv_drum()` is private to `test()`. Neither is `pub_err()` even if it public as `pv_mod` is private to `test()` (is not on the same level, nor is an ancestor)
 ##### Using `pub` with structs and enums
 If `pub` is used before `struct` its fields are still private, even simple variables.
-If an `enum` is public its elements are too.
-##### The `use` keyword to bring paths into a scope
-`use` can be called from everywhere (function, root, module etc).
-`use crate::sound::instrument;` brings an absolute path into scope and allows to directly use `instrument::whatever`.
-To bring a relative path into scope (ie from the current scope), use the `self` keyword: `use self::sound::instrument;`.
+If an `enum` is public its elements are too
+
+## Importing names with `use`
+##### Concise imports with `use`
+`use` can be called from everywhere (function, root, module etc). It is useful to shorten paths.
+Naked `use` brings the absolute (NOT relative) path into scope (crate name)
+###### `use crate`
+`crate` refers to the current (vs external) crate: `use crate::sound::instrument;` brings the absolute path (crate root) into scope
+`use sound::instrument;` works (bc `sound` is the crate name) but is a bad practice as it is not explicit
+###### `use self` to import using the relative path
+`self` refers to the current module: `use self::sound::instrument;`. Only valid way to refer to a relative path
+###### `use super` to call parent module
+`super` refers to the parent module (ie `../` to the path). As said above, all `super` components are public for the caller
+###### `use ::` to explicitly refer to an external crate
+`::` explicitly refers to an external (vs local) crate (useful if the root module has the same name as a crate)
+###### One `use` for several paths
+`use std::io::{self, Write};` brings into scope the `std::io` and `std::io::Write` modules
+###### Bringing all public definitions into scope (`*` Glob operator)
+`use std::collections::*;`. To use sparingly (mainly in `tests` module)
 ##### Idiomatic `use` paths for functions vs. other items
-`use` path for functions / structs / enums etc is a bad practice (`use crate::sound::instrument::clarinet;`). It is better to use `use` on modules to keep it clear that path definition is not local.
+`use` path for functions / structs / enums etc is a bad practice. It is better to use `use` on modules to keep it clear that path definition is not local
 ##### Renaming types brought into scope with the `as` keyword
 if two types have the same name, either: bring its parent to scope (exception of the previous rule) or rename it: `use std::io::Result as IoResult;`
 ##### Re-exporting names with `pub use`
@@ -398,35 +467,17 @@ mod performance_group {
 [dependencies]
 rand = "0.5.5"
 ```
-makes rand available from everywhere but `use rand::needed_trait` is needed to bring a trait of a package into scope.
-Exception: `std` (which is an absolute path) is shipped with rust so no need to update *Cargo.toml* but `use` is still requiered to bring items into scope.
-##### Nested paths forcleaning up large `use` lists
-`use std::io::{self, Write};` brings into scope the `std::io` and `std::io::Write` modules.
-##### Bringing all public definitions into scope (Glob operator)
-`use std::collections::*;` to use sparingly (mainly `tests` module)
+makes rand available from everywhere: `use rand::needed_trait` is needed to bring a trait of a package into scope
+Exception: `std` is a built-in dependency but still needs to be bring into scope with `use`
 
-#### Separating modules into different files
-sound could be moved into a *src/sound.rs* file. It would be called in main as:
-```
-mod sound; // semicolon tells Rust to load a module with the same name as the module.
-
-fn main() {
-    crate::sound::instrument::clarinet();
-    // OR
-    sound::instrument::clarinet();
-}
-```
-The `instrument` module can be isolated too: *src/sound/instrument.rs* can be created to handle the `instrument` module and leave only the `mod instrument;` into the `sound` module.
 
 # COMMON COLLECTIONS (8)
-Stored on the heap vs tuples and build-in arrays.
-Amount of data stored does not need to be known at compile time.
-Most commonly used: Vectors, Strings and Hash Maps.
+Collections are stored on the heap vs tuples and build-in arrays. So the amount of data stored does not need to be known at compile time
 
 ## Vectors `Vec<T>` (8.1)
-Store several values of any single data type.
+Store several values of any SINGLE data type.
 ##### Create
-`let v: Vec<i32> = Vec::new();` but if there are initial values type can be infer using `vec!` macro: `let v - vec![1, 2, 3];`
+`let v: Vec<i32> = Vec::new();` but if there are initial values, use the `vec!` macro: `let v = vec![1, 2, 3];` (type is inferred)
 ##### Update
 ```
 let mut v = vec![1, 2, 3];
@@ -436,8 +487,9 @@ There is a pop method too that removes and returns the last elements.
 ##### Drop
 The vector and all its elements are dropped when out of scope.
 ##### Reading elements
-`&v[9]` or `v.get(9)` gets the ninth elem. If the index does not exist:
-- `[]` will panic. Use it if non-existant indexes should not be passed.
+`&v[9]` (would take ownership without `&`) or `v.get(9)` gets the ninth elem
+If the index does not exist:
+- `[..]` will panic. Use it if non-existant indexes should not be passed.
 - with the accessor `get` it will return `None`. Should be used with the `match` expr: 
     ```
     match v.get(9) {
@@ -454,7 +506,7 @@ v.push(6); // mutable borrow
 ```
 will not compile because if the new element pushed implies a reallocation, the reference to the first would then point to a deallocated zone = crash.
 ##### Iterate
-read: `for i in &v {}`
+read: `for i in &v {...}`
 write: `for i in &mut v { *i += 50; }`. Note that i has to be dereferenced before it can be used with the `+=` operator.
 ##### Using Enums to store multiple types
 ```
@@ -2110,6 +2162,55 @@ unsafe impl Foo for i32 {
 ```
 
 ## Advanced Lifetimes (19.2)
+Every reference has a lifetime but most of the time Rust infers it. Advanced forms: *lifetime subtyping, lifetime bounds, trait object lifetimes*
+##### Lifetime subtyping
+Example of a parser:
+```
+struct Context<'a>(&'a str); // holds a string slice
+
+struct Parser<'a> { // holds a reference to a Context instance
+    context: &'a Context<'a>,
+}
+
+impl<'a> Parser<'a> {
+    fn parse(&self) -> Result<(), &str> {
+        Err(&self.context.0[1..]) // the string from its first byte
+    }
+}
+```
+For simplicity sakes Parser::parser always returns a dumb Error: the part of the slice that failed.
+This example would not compile without these lifetime parameters. Even now it would not compile if this function was called:
+```
+fn parse_context(context: Context) -> Result<(), &str> {
+    Parser { context: &context }.parse()
+}
+```
+...as both the `Parser` instance and the `context` parameter would die at the end of `parse_context()` since the function took ownership of `context`.
+Solution could be for the lifetime (lets say `<'s>` of the string slice and the return value of `parse_context()` to be the same... but it would not compile bc if `'s` lives shorter than `'c` (the lifetime of `Parse` and `Context` reference) then the reference to `Context` would not be valid. But *lifetime subtyping* point is to guarantee `'s` will live as least as long as `'c`! It is made by writing: `'s: 'c`. Full and valid result:
+```
+struct Context<'s>(&'s str);
+
+struct Parser<'c, 's: 'c> {
+    context: &'c Context<'s>,
+}
+
+impl<'c, 's> Parser<'c, 's> {
+    fn parse(&self) -> Result<(), &'s str> {
+        Err(&self.context.0[1..])
+    }
+}
+
+fn parse_context(context: Context) -> Result<(), &str> {
+    Parser { context: &context }.parse()
+}
+```
+##### Lifetime bounds
+Allows to add lifetime params as contraints on generic types.
+Example: `struct Ref<'a, T>(&'a T);` would not compile as it is unsure `T` will live at least as long as `'a` so the right definition will be: `struct Ref<'a, T: 'a>(&'a T);` which is a *lifetime bound*
+Other solution would be: `struct StaticRef<T: 'static>(&'static T);` since `'static` means the ref must live as long as the entire program (ie longer than `'a`). IE a type without any ref counts as `T: 'static` since it has no ref... so `T` will be constrained to types that have only `'static` references or no references
+##### Trait object lifetimes
+Trait objects consist of referencing a trait in order to use dynamic dispatch. But if the type implementing this trait has a lifetime, it can be specified with: `Box<Foo + 'a>`. Consequence: any implementer of the `Foo` trait that holds a reference inside must have its (the implementer) lifetime specified (pas compris)
+
 ## Advanced traits (19.3)
 ##### Associated types
 For example `Iterator` has an associated type named `Item` which is the type of the iterated values
@@ -2189,6 +2290,37 @@ So if `RHS` is not defined it will have its default concrete type (the same as `
 ##### Fully qualified syntax for disambiguation
 Several traits can share the same method's name. If they are implemented on one type (which can directly have a method with this same name), by default the direct type method will be called. To prevent this, rather than doing the standard `receiver.method(args);` do: `<Type as Trait>::method(receiver, args);` or shortened `Trait::method(receiver)`
 ##### Supertraits to use one trait's functionality within another trait
+A trait can use another trait's functionality like: `trait OutlinePrint: Display {`. If OutlinePrint trait is implemented on a type like `Point`, this type will have to implement `Display` to compile:
+```
+use std::fmt;
+
+impl OutlinePrint for Point {}
+impl fmt::Display for Point {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "({}, {})", self.x, self.y)
+    }
+}
+```
+##### The newtype Pattern to implement external traits on external types
+The orpahn rule says traits can be implemented on a type only if either the type / trait is local to the crate. Exception: the *newtype pattern* involves creating a wrapper around a type (a one field tuple struct: `struct Meters(u32)`). A non-local trait can be implemented on the wrapper of a non-local type.
+```
+use std::fmt;
+
+struct Wrapper(Vec<String>);
+
+impl fmt::Display for Wrapper {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "[{}]", self.0.join(", "))
+    }
+}
+
+fn main() {
+    let w = Wrapper(vec![String::from("hello"), String::from("world")]);
+    println!("w = {}", w);
+}
+```
+Explanation: print the wrapper by accessing to the inner `Vec` via `self.0`.
+Downside: the newtype does not have the methods of its concrete type, they would have to be implemented manually or implement the Deref trait to return the inner type (would have ALL methods which can be an issue too).
 
 ## Advanced types (19.4)
 *newtypes*, *aliases*, `!` type, dynamically sized types
@@ -2480,3 +2612,27 @@ the `derive` attrb appliable to a struct / enum definition implements traits. Li
 Edition is found in the *Cargo.toml* file
 Rust language and compiler are updated every 6 weeks but new *editions* are pushed (in a 6-week update) every 2/3 years into a clear package, with fully updated documentation and tooling. Good and clean and fully updated rally point.
 `cargo fix --edition` upgrades code to a new edition
+
+## Newest features (21.7)
+##### Field init shorthand
+`struct, enum, union` named fields can now be compacted:
+```
+struct Person {
+    name: String,
+    age: u8,
+}
+
+let peter = Person { name: name, age: age }; // full initialisation
+let portia = Person { name, age }; // new sugar initialisation
+```
+##### Return from loops
+`break` can now be used to return from loops
+```
+let result = loop {
+    counter += 1;
+
+    if counter == 10 {
+        break counter * 2; // break returns 20
+    }
+};
+```
