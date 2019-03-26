@@ -1,9 +1,10 @@
 # RUST 2015 (+ 2018 update)
 
 # Side Notes
-- Statements vs expressions: statements perform an action but do not return a value. Expr evaluate to a resulting value. But expressions can be part of statements (ex: `6` expr from `let = 6;` statement).
-- Generic type work best for homogeneous collections but trait bounds work best with multiple possible types.
+- Statements vs expressions: statements perform an action but do not return a value. Expr evaluate to a resulting value. But expressions can be part of statements (ex: `6` expr from `let = 6;` statement)
+- Generic type work best for homogeneous collections but trait bounds work best with multiple possible types
 - Convert decimals to binaries: count right to left, from 2^0 to 2^X... add 2^X when a 1 is found. Nice ref to converters (https://www.culture-informatique.net/conversion-binaire-decimal-hexadecimal-main/)
+- Giving to the compiler a wrong return type (`let f : u32 = String::from("hello.txt");`) will led to the compiler giving out what type return was excepted
 
 # Code Conventions
 - variables are snake case (lowercase + underscore)
@@ -30,7 +31,8 @@ On Windows: `https://www.rust-lang.org/install.html`
 `cargo check` checks code but does not actually creates the exe. Faster
 `cargo run` compiles + runs it (== `cargo build && ./target/debug/pjname`)
 `cargo install` for easy installation of tools (ex: `cargo_update` or `mdbook`)
-NB: 2 kinds of errors when compiling. Compilation errors and runtime errors are checked by the `cargo run` command.
+NB: 2 kinds of errors when compiling. Compilation errors and runtime errors are checked by the `cargo run` command
+
 ## Rust features (2018)
 ###### Projects
 Rust projects can either be: a package (set of one+ crates), or since Rust 2018 a workspace (set of packages).
@@ -501,7 +503,7 @@ If the index does not exist:
 
 Impossible to hold an immutable ref to a vector and try to add elems: 
 ```
-let first = &v[0]; // immutable borrow
+let first = &v[0]; // immutable borrow not for `first` to take ownership of the data
 v.push(6); // mutable borrow
 ```
 will not compile because if the new element pushed implies a reallocation, the reference to the first would then point to a deallocated zone = crash.
@@ -527,7 +529,7 @@ Nice trick to use any exhaustive types.
 ## Strings (8.2)
 Collection of UTF-8 encoded chars.
 ##### Definition
-By opposition to *string literals* `str` which are stored in the binary output of the program, `String`s are stored in the heap.
+By opposition to *string slices* `str` which are stored in the binary output of the program, `String`s are stored in the heap.
 ##### Creation
 `let mut s = String::new();` creates an empty string
 `let s = "test".to_string();` OR `let s = String::from("test");` create a `String` from a literal
@@ -542,52 +544,44 @@ let s3 = String::from("toe");
 let s = s1 + "-" + &s2 + "-" + &s3;
 ```
 `+` operator calls `fn add(self, s: &str) -> String {`.
-It works even if `&s2` type is `&String` bc compile can *coerce* `&String` into a `&str` param.
-Second argument is a `ref` so s2 will still be valid. But first is not, `s1` will not.
-
+It works even if `&s2` and `&s3` type is `&String` bc compile can *coerce* `&String` into a `&str` param.
+Second argument is a reference so s2 will still be valid. But first is not, add takes ownership of the first param. Note that `&s != &s1`
 Concatenation can be done without taking any ownership, using a macro: `let s = format!("{}-{}-{}", s1, s2, s3);`.
 ##### Indexing into Strings
 In Rust a letter can be seen either as:
 - bytes: [224, 164, 164, 224, 165, 135]
 - scalar values: ['त', 'े'] (second value is a diacritic not a char)
 - grapheme clusters (the closest thing to letters): [ "ते" ]
-
-`let c = &"hello"[0];` is invalid as it would be a source of many bugs and a performance issue: bc in memory `Strings` are a wrapper over a `Vec<u8>`, `s1[0]` would return the first byte `104` (`'h'` in utf8) and not the first char.
-len of `let len = String::from("Здравствуйте").len();` is not 12 (unicode scalar value), it is 24 (bytes needed to encode in UTF-8). 
-
+`let c = &"hello"[0];` is invalid as it would be a source of many bugs and a performance issue.
+In memory `Strings` are a wrapper over a `Vec<u8>`, `s1[0]` would return the first byte `104` (`'h'` in utf8) and not the first char.
+len of `let len = String::from("Здравствуйте").len();` is not 12 (unicode scalar value) but 24 (bytes needed to encode in UTF-8). 
 ##### Slice
-`let s = &"Здравствуйте"[0..4];` `s -> "Зд"` works but it is not safe: `let s = &"Здравствуйте"[0..1];` Rust would panic at runtime bc the index is invalid.
+`let s = &"Здравствуйте"[0..4];` `s -> "Зд"` luckily works in this range but it is not safe: `[0..1];` range would cause the program to panic bc the index is invalid.
 Solutions:
 - iterate over scalar unicode values with `chars`: `for c in "नमस्ते".chars() {`
 - iterate over bytes values with `bytes`: `for b in "नमस्ते".bytes() {`
 - iterate over grapheme clusters is complex and is provided by crates, not by the standard library.
 
 ## Hash Maps (8.3)
-The type `HashMap<K, V>` associates a value with a key via an implementation of maps. This type is not included in the prelude.
-`HashMap`s are hashed and therefore DoS resistant (speed / safe balanced algo). But another *hasher* can be specified (`BuildHasher` trait) that can be implemented by hand or called from a public library.
-
+The type `HashMap<K, V>` contains a map of key (any type) / value (any other type) pairs. This type is not included in the prelude.
+`HashMap`s are hashed and therefore DoS resistant (speed / safe balanced algo). But another *hasher* can be specified (`BuildHasher` trait) that can be implemented by hand or called from a library
 ##### Creation
-`let mut scores = std::collections::HashMap::new();` creates an empty has map.
+`let mut scores = std::collections::HashMap::new();` creates an empty hash map.
 `scores.insert(String::from("Blue"), 10);` all the keys / values (distinctly) must have the same type.
 ```
 use std::collections::HashMap;
-
 let teams  = vec![String::from("Blue"), String::from("Yellow")];
 let initial_scores = vec![10, 50];
-
 let scores: HashMap<_, _> = teams.iter().zip(initial_scores.iter()).collect();
 ```
 type of score can not be infered bc `collect()` can return different types.
-`teams.iter().zip(initial_scores.iter())` creates a vector of tuples.
-
+`teams.iter().zip(initial_scores.iter())` creates a vector of tuples using iterators: `it.zip(it)`.
 ##### Ownership
 For `Copy` trait types (i32...) values are copied. For owned values (`Strings`...) the `HashMap` values are moved and it becomes the owner unless a ref is used but the variable must live until the `HashMap` dies.
-
 ##### Access
 `let score = scores.get(&String::from("Blue"));` As `get` returns an option the result will be `Some(&10)`.
 `for (key, value) in &scores {` works.
 ! order is arbitrary.
-
 ##### Update
 ###### By overwriting a value
 Simply redo `scores.insert(String::from("Blue"))` will overwrite the old value.
@@ -599,16 +593,15 @@ Simply redo `scores.insert(String::from("Blue"))` will overwrite the old value.
 let score = map.entry(String::from("Blue")).or_insert(0);
 *score += 10;
 ```
-blue team, if exists, sees its score updated. `score` has type `&mut V` so it needs to be refererenced to be updated. 
-
+blue team, if exists, sees its score updated. `score` has type `&mut V` so it needs to be deref to be updated. 
 ##### Print
 `println!("{:?}", scores);` will output `{"Yellow": 50, "Blue": 10}`.
 
 # Error Handling (9)
 Rust does not have exceptions and instead distinguishes 2 types of errors:
 - *unrecoverable* errors
-    Set by the dev
     Stop the execution of the program
+    Can be set by the dev
     Covered by the usage of the `panic!` macro
 - *recoverable* errors
     ex: file not found.
@@ -616,27 +609,25 @@ Rust does not have exceptions and instead distinguishes 2 types of errors:
     Covered by the usage of the `Result<T, E>` type
 
 ## Unrecoverable Errors with panic! (9.1)
-When the `panic!` macro executes program prints a failure message, clean the program (*unwinds*) then quit it.
-! *abort* which quits without unwinding and lets the operating system cleaning the memory.
-`panic!` result can be set to *abort* in the *Cargo.toml* file.
+When the `panic!` macro is executed, the program prints a failure message, Rust cleans the program (*unwinds*) then quit it.
+!= *abort* which quits without unwinding and lets the operating system clean the memory. (`panic!` result can be set to *abort* in the *Cargo.toml* file)
 ```
 [profile.release]
 panic = 'abort'
 ```
-A call to the `panic!` macro causes this message: `thread 'main' panicked at 'crash message set', src/main.rs:2:4`.
-When the `panic!` calls comes from an external library (!= our source code) we will need a backtracker to find the origin bc the error message points to the lib.
-Example: `let v = vec![1, 2, 3];` if we try to access a non-existant value (`v[99]`) in C we would hit a memory that is not ours (*buffer overread*). In Rust will panic: `thread 'main' panicked at 'index out of bounds: the len is 3 but the index is 99', /checkout/src/liballoc/vec.rs:1555:10`
-Running `RUST_BACKTRACE=1 cargo run` with debug symbols enabled (meaning `--release` flag is not set) allows to catch the error from our own code: `11: panic::main at src/main.rs:4`.
+A call to the `panic!` macro causes this message: `thread 'main' panicked at 'crash message set', src/main.rs:2:4`
+When a `panic!` call comes from an external library we will need a backtracker to find the insourced origin. Example: in `let v = vec![1, 2, 3];`, if we try to access a non-existant value (`v[99]`) (*buffer overread*) -> systematic panic: `thread 'main' panicked at 'index out of bounds: the len is 3 but the index is 99', /checkout/src/liballoc/vec.rs:1555:10`. Running `RUST_BACKTRACE=1 cargo run` with debug symbols enabled (meaning `--release` flag is not set) allows to catch the error from our own code: `11: panic::main at src/main.rs:4`.
 
 ## Recoverable Errors with Result (9.2)
-`Result` definition (`T` and `E` represent the value returned depending on the case):
+`Result<T, E>` definition (`T` and `E` represent the value returned depending on the case):
 ```
 enum Result<T, E> {
     Ok(T),
     Err(E),
 }
 ```
-Example: `open()` returns a `Result` value. If it succeeds f will contain an instance of `Ok` that contains the `std::fs::File` (file handler). If it fails f will contain an instance of `Err` that contains a `std::io::Error` type.
+Example: `let f = open("filename");` returns a `Result`. If it succeeds `f` will hold an instance of `Ok` that contains the `std::fs::File` (file handler). If it fails `f` will hold an instance of `Err` that contains a `std::io::Error`
+##### Matching on different errors
 ```
 fn main() {
     let f = std::fs::File::open("hello.txt");
@@ -647,70 +638,67 @@ fn main() {
                 Ok(fc) => fc,
                 Err(e) => panic!("Tried to create file but there was a problem: {:?}", e),
             },
-            other_error => panic!("There was a problem opening the file: {:?}", other_error),
+            other_error => panic!("Unrecoverable problem opening the file: {:?}", other_error),
         },
     };
 }
 ```
-Tip: giving to the compiler a wrong return type (`let f : u32 = std::fs::File::open("hello.txt");`) will led to the compiler giving out what was excepted.
-`Result::` specifier is not needed bc it is part of the prelude.
-
+`Result::` specifier is not needed bc it is part of the prelude
+##### Shortcuts for panic on error:
 `match` alternatives:
 - `let f = File::open("hello.txt").unwrap();`. `unwrap` will either return directly the result of `Ok` or automatically call the `panic!` macro.
-- `let f = File::open("hello.txt").expect("Failed to open hello.txt");`. `expect` is similar to `unwrap` with a provided `panic!` message (easier to know where the error comes from).
+- `let f = File::open("hello.txt").expect("Failed to open hello.txt");`. `expect` is similar to `unwrap` with a provided `panic!` message (easier to know where the error comes from)
 ##### propagating errors
-IE return the error to the calling code instead of handling it within the function.
+IE return the `Result`/error to the calling code instead of handling it within the function. Can be better
 ###### The `?` operator
 ```
 fn read_username_from_file() -> Result<String, io::Error> {
-    let mut f = File::open("hello.txt")?;
     let mut s = String::new();
-    f.read_to_string(&mut s)?;
+    let mut f = File::open("hello.txt")?.read_to_string(&mut s)?;
     Ok(s) // called if everything works fine
 }
 ```
-This code can be shortened as:
-```
-    let mut s = String::new();
-    File::open("hello.txt")?.read_to_string(&mut s)?;
-    Ok(s)
-```
-actually all this could be shortened to returning `fs::read_to_string("hello.txt")` which opens the file by itslef.
-`?` is a nice shortcut. (It calls the `from` trait which converts error types, *so what ?*).
-Both `open()` and `read_to_string()` output a `Result`. If `Err`: function returns the error, if `Ok` it keeps going through the code.
-! `?` can only be used inside a function that returns a `Result` (`fn -> Result<String, io::Error> `) or it will not compile. Note that even the main can return a `Result`: `fn main() -> Result<(), Box<dyn Error>> {`.
+(actually all this could be shortened to returning `fs::read_to_string("hello.txt")` which opens the file by itself)
+`?` is a nice shortcut: if the `Result` is `Ok`, it is returned from the expression and the program continues. If the `Result` is an `Error`, the `Error` is returned from the hole function
+! `?` can only be used inside a function that returns a `Result` or it will not compile.
+Note that even the main can return a `Result`: `fn main() -> Result<(), Box<dyn Error>> {`
 
 ## To panic! or not to panic! (9.3)
-Compiler does not understand logic. So when a code has 0% chances to have an `Err`, `unwrap()` (returns the value from `Ok` or panics if `Err`) with no check is a good practice.
-`unwrap` (or `expect`) is a good practice when you have not decided yet how to deal with the error.
+Compiler does not understand logic. So when a code has 0% chances to have an `Err`: call `unwrap()` (returns the value from `Ok` or panics if `Err`) with no check is a good practice.
+`unwrap()` (or `expect()`) is a good practice too when you have not yet decided how to deal with the error.
 ##### Guideline
-`panic!` when code is in a *bad state*, ie:
-- When a value is invalid AND either: not expected to happen or code relies on being stable at this point or there is no good way to encode the information or it exposes to vulnerabilities
+When a failure is expected, even if the code is in a *bad state*, use `Result` In any other case when code is in a bad state, call `panic!`:
+- When a value is invalid and either:
+    - not expected to happen
+    - code relies on being stable at this point
+    - there is no good way to encode the information
+    - it exposes to vulnerabilities
 - When someone uses your code and passes a values that does not make sense
-- When external code fails and there is no way to fix it ... unless a failure is the expected possibility, then `Result`.
+- When external code fails and there is no way to fix it (unless a failure is the expected possibility, then `Result`)
 
-Pre-checks:
-- No need to check whether a value has been passed to a function if the param as a type and not an `Option` bc no value = will not compile
-- Use unsigned type when possible to ensure only positive values
-- In a module:
+##### Pre-checks
+- Prevent annoying checking by using types rather than `Option` as the compiler itself ensured the value is valid
+- Use unsigned types when possible to ensure only positive values
+###### Create custom types for validation
+Using a module/struct:
     - implement a `new` method that does all checks and returns the good type(s). If not, `panic!` bc the contract is broken. Regrouped and secured checks (at creation).
     - implement public setters/getters and keep variables private, so that only the setter does a check when editing a value (getter example: `pub fn value(&self) -> i32 { self.value }`)
 
 
 # GENERIC TYPES, TRAITS AND LIFETIMES (10)
 ## Generic data types (10.1)
-A given generic type name can represent any given type but once it has been given, it keeps this same type.
+A generic type name can represent any given type but once it has been given, it keeps this same type. ?????
 ##### In functions
-`fn largest<T>(list: &[T]) -> T {`: `<T>` before params in the signature is mandatory so the compiler knows what `T` means.
-Note: `T` (short for *type*) is the common identifier name. The input and output must have the same type but it can be any type.
+`fn largest<T>(list: &[T]) -> T {`: `<T>` before params in the signature is mandatory so the compiler knows what `T` means
+The input and output of the function must be of the same type but it can be any type.
 ##### In structs
 `struct Point<T> { x: T, y: T, }`. Note that code will not compile if all type `T` fields are not of the same type.
 But there can be different *generics*: `struct Point<T, U> { x: T, y: U, }`.
 ##### In enums
 `enum Option<K, E> { Ok(K), Err(E), };`. Same thing.
 ##### In method definitions
-In the `Point` struct, implement a `x` method: `impl<T> Point<T> {`. We need to declare `<T>` after `impl` too so the compiler knows that the `T` type from `Point` is a *generic*.
-Generic types declared in the implementation methods can differ from the original one, Ex:
+We need to declare `<T>` after `impl` too so the compiler knows that the `T` type from `Point` is a *generic*.
+Generic types declared in the implementation methods can differ from the original ones, Ex:
 ```
 struct Point<T, U> {
     x: T,
@@ -728,9 +716,8 @@ impl<T, U> Point<T, U> {
 ```
 `impl` generic type declarations can differ from method type parameters but must be the same as struct.
 Note that `<T, U>` are declared paired with Struct definition, `<V, W>` are declared after that, in their own relative scope 
-
 ##### Performance of code using generics
-NO performance difference at runtime between generic and its concrete equivalent type. But takes longer to compile (*Monomorphization* = recreate code with concrete type from the generic form).
+NO performance difference at runtime between generic and its concrete equivalent type. But takes longer to compile bc of the *Monomorphization* process (recreate code with concrete types from the generic form)
 ```
 //generic
 enum Option<T> { Some(T), None, }
@@ -745,16 +732,17 @@ let float = Option_f64::Some(5.0);
 ```
 
 ## Traits: defining shared behavior (10.2)
-A *trait* tells the compiler about a type's fonctionality. Resembles to *interfaces*
+A *trait* tells the compiler about a type's fonctionalities. Resemble to *interfaces*
+Traits save runtime performance and crashes as the compiler checks that every (generic) type implements needed methods
 ##### Trait definition
 ```
 pub trait Summary {
     fn summarize(&self) -> String; // note the semicolon != brackets
 }
 ```
-Now, any type that has the `Summary` trait must have the `summarize` method with the same signature
-Needs to be `pub` so that another crate can implement it
-It is implemented as:
+Now, any type that implements the `Summary` trait must have a `summarize` method with the same signature
+A trait needs to be `pub` so that another crate can implement it
+Implement it by adding `TraitName for` between `impl` and `StructName`, then define methods as usual:
 ```
 pub struct NewsArticle {
     pub headline: String,
@@ -769,51 +757,44 @@ impl Summary for NewsArticle {
     }
 }
 ```
-implementing a trait looks similar to implementing methods with `for` added.
-It is possible to make a trait local to a scope.
-! *coherence* restriction: if neither trait or type are locally defined, the trait needs to be brought into scope as: `use externalcrate::Summary;`
-
+It is possible to make a trait local to a scope
+! *coherence* restriction: a trait can be implemented on a type only if either the type or trait is local (to our crate)
 ##### Default implementations
 Are overwritten by specific methods for a given trait but are useful. Defined directly in the trait definition (vs semicolon)
 ```
 pub trait Summary {
+    fn summarize_author(&self) -> String;
     fn summarize(&self) -> String {
-        String::from("(Read more...)")
+        format!("(Read more from {}...)", self.summarize_author()) // default implementation
     }
 }
 ```
-Here if not overwritten, a default string will be created.
-To use the default implementation in an instance, call it empty: `impl Summary for NewsArticle {}`.
-
-##### Traits as arguments
-Only works with types that actually implements the required trait
-`pub fn notify(item: impl Summary) {` gives access to `item.summarize()` in the fun body.
-This form is a sugar for `pub fn notify<T: Summary>(item: T) {`, the last can be useful when 2+ params have the trait type: `pub fn notify<T: Summary>(item1: T, item2: T) {`.
-Several traits can be `impl`: `pub fn notify(item: impl Summary + Display) {` or `pub fn notify<T: Summary + Display>(item: T) {` or even using `where`:
-```
-pub fn notify<T>(item: T) -> i32
-    where T: : Summary + Display
-{
-```
+To use a default method, implement the trait but do not define or declare the default method (ignore it). By re-defining it, the implementer would override it
+Note that it isn’t possible to call the default implementation from an overriding implementation of that same method
+##### Traits bounds
+Specify *trait bounds* on a generic type means telling the compiler a type must hold an implementation a given trait
+`pub fn notify(item: impl Summary) {` announces the `item` type implement `Summary` and therefore has access to the `summarize()` method.
+Note that there are 3 possible syntaxes and several traits can be `impl`:
+- `pub fn notify(item: impl Summary + Display) {`
+- `pub fn notify<T: Summary + Display>(item: T) {`
+- Use the `where` keyword:
+    ```
+    pub fn notify<T, U>(item: T, foo: U) -> i32
+        where T: Summary + Display,
+              U: Clone + Display  
+    {
+    ```
 ##### Returning traits
-```
-fn returns_summary() -> impl Summary {
-    Tweet {
-        username: String::from("Horse_ebooks"),
-        reply: false,
-    }
-}
-```
-Says something that implements the `Summary` trait is returned but the exact type is unknown (we are returning an `iterator`).
-! If the return type is unsure depending on how the function goes this cannot work.
-
+`fn returns_summary() -> impl Summary {`
+Says a type that implements the `Summary` trait is returned but the exact type is unknown
+! If the return type (which impl the trait anyway) is unsure depending on how the function goes, it will not compile
 ##### Compare `largest` function with trait bound
 To allow comparison and slices largest needs: 
 ```
 fn largest<T: PartialOrd + Copy>(list: &[T]) -> T {
     let mut largest = list[0]; // Copy trait needed to copy a <T>
     for &item in list.iter() {
-        if item > largest { // PartialOrd trait needed to compare a <T>
+        if item > largest { // PartialOrd trait needed to compare <T>s
             largest = item;
         }
     }
@@ -832,13 +813,15 @@ impl<T: Display + PartialOrd> Pair<T> {
     }
 }
 ```
-Here `cmp_display` is implemented only if `Display + PartialOrd` are implemented.
-*Blanket implementations* are extensively used: `impl<T: Display> ToString for T { }`. Here the `to_string()` method can be called on any type that implements the Display trait. That allows to turn int to string because integers implement display (`let s = 3.to_string();`)
+Here `cmp_display` is available to an hypothetical `Pair<T>` only if the `T` type has `Display + PartialOrd` implemented.
+*Blanket implementations* are extensively used: `impl<T: Display> ToString for T { }`. Here the `to_string()` method can be called on any type that implements the Display trait. That allows to turn ints to strings bc integers implement display (`let s = 3.to_string();`)
 
 ## Validating references with lifetimes (10.3)
-    Main purpose: prevent dandling references. Rust uses a *Borrow Checker* that verifies the subject of a reference doesn’t live as long as the reference.
-Every reference has a *lifetime* (the scope for which it is valid). Often inferred but it sometimes has to be explicit
-`&'a mut i32` `'a` is a lifetime parameter. 2+ required to be meaningful, the point is to connect the lifetimes of parameters and return values:
+Every reference (/variable) has a *lifetime* (`'a`, '`b'...), ie the scope for which it is valid
+*Generic lifetime parameters* are explicit lifetimes that ensure a reference stays valid as long as it needs to be. IE they define the relationship between references for the borrow checker to perform 
+The *borrow checker* verifies the subject of a reference (value) does not live as long as the reference (variable).
+They mainly prevent from dandling references
+Inferred unless the return value and at least two parameters are references. Their purpose is to connect the lifetimes of parameters and return values:
 ```
 fn longest<'a>(x: &'a str, y: &'a str) -> &'a str {
     if x.len() > y.len() {
@@ -848,8 +831,9 @@ fn longest<'a>(x: &'a str, y: &'a str) -> &'a str {
     }
 }
 ```
-will compile because lifetimes are explicit (and therefore Rust compiler knows they are 'synced'). It would not otherwise. Doing so we are not modifying their lifetime, we are just precising these to the compiler by saying "these three variables will and must at least exist in this scope".
-As a result, the compiler thinks the lifetime is equal to the smaller of the lifetimes. So this code will not compile:
+will compile because lifetimes are explicit. It would not otherwise. We are not modifying their lifetime, we are just precising these to the compiler by saying "these three variables will at least exist in this scope".
+Ofc if the returned reference refers to a variable created in the function it will not compile anyway (here should be returned the owned data, not a ref).
+The compiler always thinks the lifetime is equal to the smaller of the lifetimes. So this code will not compile:
 ```
 fn main() {
     let string1 = String::from("long string is long");
@@ -861,19 +845,17 @@ fn main() {
     println!("The longest string is {}", result);
 }
 ```
-So when to specify lifetime params ? When a reference returned does not refer to a given param (above example: several params at the same time). Ofc if the returned reference refers to a variable created in the function it will not compile anyway (here should be returned the owned data, not a ref).
-
 ##### Lifetime annotations in struct definitions
 Struct can hold references, but only if they have a lifetime annotation.
-`struct ImportantExcerpt<'a> { part: &'a str, }` it means an instance of this struct cannot outline its shortest ref lifetime (`'a`)
+`struct ImportantExcerpt<'a> { part: &'a str, }` it means an instance of this struct cannot outlive its shortest ref lifetime (`'a`, that has existed before the instance)
 ##### Lifetime elision rules
 There are *input / output lifetimes* (params / return)
-Lifetime annotation can be inferred only in `fn` and `impl` cases. If the 3 following rules are applied and a reference does not have a lifetime, the annotation will not be inferred:
+Lifetime annotation can be inferred only with `fn` and `impl` blocks definitions. If the 3 following rules are applied and a reference does not have a certain lifetime, the annotation will have to be specified:
 - each ref param gets its own lifetime
 - if there is exactly 1 ref param its lifetime is assigned to all output lifetime parameters
 - if one of several params is `&self` or `&mut self` its lifetime is assigned to all output lifetime parameters
 #####  Static lifetime
-`'static` is a special lifetime which denotes the entire duration of the program: like all string literals. Should be use only when we want a variable to last the entire program
+`'static` is a special lifetime which denotes the entire duration of the program: like all string literals (they are stored in the binary). Should be used only when we want a variable to last the entire program
 
 
 # Testing (11)

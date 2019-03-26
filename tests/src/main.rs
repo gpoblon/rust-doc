@@ -33,12 +33,11 @@ fn main() {
 
 use ft_lib::sound;
 
+fn longest(x: &str) -> &str {
+    x
+}
 fn main() {
     println!("sound imported");
-    ft_lib::test();
-    sound::pv_mod_fn();
-    // sound::instrument::clarinet(); // will compile as `clarinet()` and its parent are public
-    // sound::instrument::pv_drum(); // will not compile as `pv_drum()` is not public
-    // sound::pv_mod::pub_err(); // will not compile as `pv_mod` is not public
-
+    // ft_lib::test();
+    // sound::pv_mod_fn();
 }
