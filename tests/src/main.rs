@@ -33,9 +33,6 @@ fn main() {
 
 use ft_lib::sound;
 
-fn longest(x: &str) -> &str {
-    x
-}
 fn main() {
     println!("sound imported");
     // ft_lib::test();

@@ -1,9 +1,9 @@
 pub mod instrument;
 
 mod pv_mod {
-    pub fn pub_err() {
+    pub fn pub_err() -> String {
         println!("pv_err() called");
-        super::instrument::clarinet();
+        super::instrument::clarinet()
     }
 }
 
@@ -11,9 +11,9 @@ fn ake() {
     println!("COUCOU");
 }
 
-pub fn pv_mod_fn() {
+pub fn pv_mod_fn() -> String {
     println!("accessed from pv_mod module");
-    pv_mod::pub_err();
+    pv_mod::pub_err()
 }
 
 // fn test() {
@@ -21,3 +21,13 @@ pub fn pv_mod_fn() {
 //     sound::instrument::pv_drum(); // will not compile as `pv_drum()` is not public
 //     sound::pv_mod::pub_err(); // will not compile as `pv_mod` is not public
 // }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn internal() {
+        assert_eq!(pv_mod_fn(), "clariet");
+    }
+}

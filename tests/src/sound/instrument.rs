@@ -1,8 +1,9 @@
-pub fn clarinet() {
+pub fn clarinet() -> String {
     println!("clarinet() called");
-    crate::sound::ake();
+    String::from("clarinet")
 }
 
 pub fn pv_drum() {
     println!("pv_drum) called");
+    crate::sound::ake();
 }
