@@ -763,6 +763,7 @@ It is possible to make a trait local to a scope
 Are overwritten by specific methods for a given trait but are useful. Defined directly in the trait definition (vs semicolon)
 ```
 pub trait Summary {
+
     fn summarize_author(&self) -> String;
     fn summarize(&self) -> String {
         format!("(Read more from {}...)", self.summarize_author()) // default implementation
@@ -859,17 +860,13 @@ Lifetime annotation can be inferred only with `fn` and `impl` blocks definitions
 
 
 # Testing (11)
-Test body:
-- Set up any needed data or state
-- Run the code you want to test
-- Assert the results are what you expect
+Test body: set up any needed data or state -> run the code you want to test -> assert the results are what you expect
 
 ## Writing tests (11.1)
 ##### Test attribute
 When `cargo test` is run, Rust runs every `#[test]` function and report whether each test function passes or fails
 We can add as many `mod` and `fn` tests as we want
 Each test is run in a new thread. If one fails it means the test function panicked.
-
 ```
 #[cfg(test)]
 mod tests {
@@ -878,7 +875,7 @@ mod tests {
         assert_eq!(2 + 2, 4);
     }
     
-    #[test]
+    #[test] // put it before every fun to start when `cargo test` is ran
     fn another() {
         panic!("Make this test fail");
     }
@@ -901,97 +898,66 @@ failures:
 test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out
 
     Doc-tests adder // only used for documentation tests
-...
+... 
 ```
 ###### `assert!` macro
 Takes a boolean. If it returns `true` test passes but if it returns false `panic!` is called and test fails (remember to negate a function if `false` means no issue)
 ###### Test equality with the `assert_eq!` & `assert_ne!` macros
-`assert_eq!` checks for equality of 2 expr (left|excepted and right|actual), `assert_eq!` checks for inequality (useful when unsure what a value will be but sure what a value should not be)
-If one fails the values passed are printed (easier to see why the test failed)
-In some cases (structs and enums the programer define) will have to be added `#[derive(PartialEq, Debug)]` to check equality & print the values.
+`assert_eq!` checks for equality of 2 expr (left|excepted and right|actual) ; `assert_ne!` checks for inequality (useful when unsure what a value will be but sure what a value should not be)
+For each failed test values passed are printed (easier to see why the test failed)
+In some cases (locally defined structs and enums) will have to be added `#[derive(PartialEq, Debug)]` to check equality & print the values
 ##### Custom failure messages
-An optional argument can be added to `assert...!` macros that acts as the `format!` macro (variadic params) as: 
-`assert!(result.contains("Carol"), "Greeting did not contain name, value was {}", result);`
-
+A custom message can be printed by adding a 2nd+ param to `assert...!` macros. It works as the `format!` macro (variadic params):
+`assert!(false, "Greeting did not contain name, value was {}", result);`
 ##### check for panics
-the attribute `#[should_panic]` set a test as failed if `panic!` has not been called
-Must be called the line after the `#[test]` attribute.
-`expected` allows to check a `panic!` message includes the expected string literal: `#[should_panic(expected = "Guess value must be less than 100")]`. Tester will tell if program panicked & the right substring was printed, or will set the test as failed.
-
+The attribute `#[should_panic]` sets a test as failed if it did not call `panic!`
+Declared the line after the `#[test]` attribute.
+`expected` allows to check a `panic!` message includes the expected string literal: `#[should_panic(expected = "Guess value must be less than 100")]`. Rust will tell if the program panicked and the right substring was printed, or will set the test as failed.
 ##### Using Result<T, E> in tests
-Tester can work with Ok() (passed) / Err() (failed) instead of panics.
-`#[should_panic]` does not work with it but it's neat anyway:
-```
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() -> Result<(), String> {
-        if 2 + 2 == 4 {
-            Ok(())
-        } else {
-            Err(String::from("two plus two does not equal four"))
-        }
-    }
-}
-```
+Tester can work with `Result`: returning Ok() (passed) / Err() (failed) instead of panics
+Note that `#[should_panic]` does not work with it
 
 ## Running tests (11.2)
-Note: ` -- ` is a separator. Pre-params apply to `cargo test` & post-params apply to the binary
+Note: ` -- ` is a separator. Pre `--` params apply to `cargo test` & post params apply to the binary
 ###### Running tests in parallel or consecutively
 `cargo test -- --test-threads=1` means NO parallelism
-Takes longer but tests will not interfere with each other if they share a state
-Example of several tests writing to a same file at the same times might result in a failed test even if the code is ok
+Takes longer but tests will not interfere with each other if they share a state (could output a biased result)
 ###### Showing function output
-By default in the test environment standard ouput (like `println!`) is not printed on passed test but it is for failed test
-`cargo test -- --nocapture` allows to print ouput on passed tests too.
+By default the test environment captures the standard ouput of passed tests (only), ie `println!` will actually not be printed... unless `cargo test -- --nocapture` flag is set
 ###### Running a subset of tests by name
 A filtered test can be run by calling any function that has a `#[test] attribute`: `cargo test test_fn_name`
-! Tests will run on every test functions that have the param as a substring
-! Works with test module names too bc the checked string is `module::fn`
-It is possible to set the `#[ignore]` attribute (after `#[test]` line): these will not be tested unless `cargo test -- --ignored` is run, which will ONLY test `ignored` functions
+! Tests will run on every `test` functions that have the param as a substring
+! Include test module names too bc the checked string is `module_nme::fn_name`
+The `#[ignore]` attribute (after `#[test]` line): these will not be tested unless `cargo test -- --ignored` is run, which will only test `ignored` functions
 
 ## Test organization (11.3)
 - *Unit tests* check every module, even private interfaces
 - *Integration tests* check code as an external user would
-Both are important to be sure pieces of a program work separately and together
-
+Both are important to be sure pieces of a program work both separately and together
 ##### Unit tests
-Located in the *src* directory in each file, alongside the code they are testing
+Located in the *src* directory, in each file, alongside the code they are testing
 Convention is to create a `tests` module in each file, annotated with `#[cfg(test)]` which tells Rust to compile it only when `cargo test` is run
-In Rust private functions can be tested, they are accessible by default by the testing environment
-
+The test being in the file, it has access to private elements that are on the same level (non-recursive)
 ##### Integration tests
-Entirely external to the library. Therefore no need for `#[cfg(test)]` but they can only call public API functions
+Entirely external to the library. No need for `#[cfg(test)]` but they can only call public API functions
 Create a *test* directory next to *src*, with a (for example) *tests/integration_test.rs* file that contains:
 ```
 use crate_name;
 
 #[test]
 fn it_adds_two() {
-    assert_eq!(4, adder::add_two(2));
+    assert_eq!(4, crate_name::add_two(2));
 }
 ```
-When running `cargo test` 3 sections will now appear: unit / integration / doc tests but only integration test can be run: `cargo test --test integration_test` (as the filename). Multiple files can be added (ex one for each functionality tested). Then will appear a new section for each file.
-This can be avoid by creating *tests/common/mod.rs*: naming convention makes so these files will not be treated as separate crates, *common* will be treated as a module: adding only `pub fn setup() { }` to `mod.rs` allows to call it from *integration_test* as a module: 
-```
-use crate_name;
-mod common;
-
-#[test]
-fn it_adds_two() {
-    common::setup();
-    assert_eq!(4, adder::add_two(2));
-}
-```
-
+When running `cargo test` 3 sections will now appear: unit / integration / doc tests but only integration test can be run: `cargo test --test integration_test` (as the filename). Multiple files (modules) can be added (ex one for each functionality tested). Each module will have its own test output section
 ###### Integration tests for binary crates
-Rust projects that provide a binary have a straightforward src/main.rs file that calls logic that lives in the src/lib.rs file.
-Doing so allows to have *integration test*. It is not possible to `use` elements of a *src/main.rs* file: binary crates are meant to run on their own
+Rust projects should always provide both a *src/main.rs* that calls its logic from the *src/lib.rs* file to allow for integration tests. IE the executable being a standalone, `use` does not work therefore only *libraries* are exposed to the *tests* dir
+
 
 # FUNCTIONAL LANGUAGE FEATURES: ITERATORS AND CLOSURES (13)
 
 ## Closures: anonymous functions (13.1)
-*Closures* are particular anonymous functions that are storable in a variable or passable as function arguments
+*Closures* are particular anonymous functions storable in a variable or passable as function arguments
 Unlike functions they capture their environment (can access parents scope variables)
 light syntax for inline closure: `let add_one = |x| x + 1 ;` ; full syntax:
 ```
@@ -1004,7 +970,6 @@ let expensive_closure = |param1, param2| { // |param1: u32, param2: u32| -> u32 
 `expensive_closure` contains the definition of the function not its result. It is called the same way a function is
 Annotate types is not needed (but possible), types are infered bc unlike functions closure are not interfaces exposed to users
 ! The compiler infers types & traits at first call so recalling a closure with different param types will not compile
-
 ###### Closures capture their environment
 Closure have, like functions, at least on of these traits that are inferred depending on what a closure does of its environment variables:
 - `FnOnce` takes ownership and consumes the environment variables, meaning this closure can only be called once
@@ -1014,7 +979,6 @@ Closure have, like functions, at least on of these traits that are inferred depe
     Implemented if the closure do not move the captured variables
 - `Fn` borrows values from the environment immutably
     Implemented for closures that do not need mutable access to the captured variables
-
 ###### Storing closures and their result
 This is known as *cache, memoization, lazy evaluation*. The solution is to store both the closure and its result in a struct. Whatever their signature is closures will have different types so solution is to consider them generics. 
 Closures are functions-like: one+ of `FnOnce` `FnMut` or `Fn` traits must be implemented too.
@@ -1083,7 +1047,6 @@ trait Iterator {
 }
 ```
 `iter()` takes immutable references to the values, but `into_iter()` takes ownership and returns the owned values. If references are mutable, `iter_mut()` can be used
-
 ##### Methods
 - Methods that consume the iterator = all methods that call `next()` like `sum()`: `let total: i32 = vec![1, 2, 3].iter().sum();`
 - Methods that produce other iterators = *iterator adaptors*: methods that changes iterators like `map()`: 
@@ -1092,7 +1055,6 @@ let v1: Vec<i32> = vec![1, 2, 3];
 let v2 = v1.iter().map(|x| x + 1).collect();
 ```
 `collect()` has to be called since `map()` does not consume the iterator (just updates it). `collect()` consumes the iterator and returns a collection of the new data
-
 ###### Iterators + closures: common use case
 ```
 #[derive(PartialEq, Debug)]
@@ -1110,7 +1072,6 @@ let shoes = vec![
 
 let in_my_size = shoes_in_my_size(shoes, 10); // filters out size: 13 shoe from the vecArray
 ```
-
 ##### Creating iterators
 ```
 struct Counter {
@@ -1144,7 +1105,7 @@ Iterator are a *zero-cost abstrations* feature bc it is compiled down to low-lev
 Iterators are slightly faster than loops
 
 
-# More about Cargo and Crates.io
+# MORE ABOUT CARGO AND CRATES.IO (14)
 
 ## Customize builds with release (14.1)
 Cargo has 2 main profiles: `dev` (used with `cargo build`) and `release` (`cargo build --release`)
