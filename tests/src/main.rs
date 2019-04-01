@@ -31,10 +31,13 @@ fn main() {
 }
 */
 
-use ft_lib::sound;
+use std::thread;
 
 fn main() {
-    println!("sound imported");
-    // ft_lib::test();
-    // sound::pv_mod_fn();
+    let mut v = 1;
+
+    let handle = thread::spawn(|| {
+        let x = v;
+    });
+    handle.join();
 }
